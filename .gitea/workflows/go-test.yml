@@ -50,6 +50,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-${{ matrix.goarch }}-
 
+      - name: Install dependencies
+        run: |
+          go install github.com/mgechev/revive@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+
       - name: Run code quality checks
         run: task check
 
