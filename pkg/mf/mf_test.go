@@ -1,0 +1,180 @@
+package mf
+
+import (
+	"bytes"
+	"encoding/hex"
+	"testing"
+
+	"git.quad4.io/Networks/Reticulum-Go/pkg/common"
+	"git.quad4.io/Networks/Reticulum-Go/pkg/destination"
+	"git.quad4.io/Networks/Reticulum-Go/pkg/identity"
+	"git.quad4.io/Networks/Reticulum-Go/pkg/transport"
+)
+
+const (
+	testMessageText = "Hello, Reticulum!"
+	errFmtHex       = "expected hex hash %s, got %s"
+)
+
+func TestMessage_PackUnpack(t *testing.T) {
+	senderHash, _ := hex.DecodeString(testHashHex)
+	text := testMessageText
+
+	msg := &Message{
+		SenderHash: senderHash,
+		Text:       text,
+	}
+
+	packed, err := msg.Pack()
+	if err != nil {
+		t.Fatalf("Pack failed: %v", err)
+	}
+
+	if len(packed) != SenderHashLength+len(text) {
+		t.Errorf("expected length %d, got %d", SenderHashLength+len(text), len(packed))
+	}
+
+	unpacked, err := Unpack(packed)
+	if err != nil {
+		t.Fatalf("Unpack failed: %v", err)
+	}
+
+	if !bytes.Equal(unpacked.SenderHash, senderHash) {
+		t.Errorf("expected sender hash %x, got %x", senderHash, unpacked.SenderHash)
+	}
+
+	if unpacked.Text != text {
+		t.Errorf("expected text %q, got %q", text, unpacked.Text)
+	}
+}
+
+func TestUnpack_TooShort(t *testing.T) {
+	data := make([]byte, SenderHashLength-1)
+	_, err := Unpack(data)
+	if err == nil {
+		t.Error("expected error for too short data, got nil")
+	}
+}
+
+func TestMessage_QoL(t *testing.T) {
+	senderHash, _ := hex.DecodeString(testHashHex)
+	text := testMessageText
+
+	msg, err := NewMessage(senderHash, text)
+	if err != nil {
+		t.Fatalf("NewMessage failed: %v", err)
+	}
+
+	if msg.Len() != SenderHashLength+len(text) {
+		t.Errorf("expected length %d, got %d", SenderHashLength+len(text), msg.Len())
+	}
+
+	if msg.FormatSenderHash() != testHashHex {
+		t.Errorf(errFmtHex, testHashHex, msg.FormatSenderHash())
+	}
+
+	expectedStr := "Message{Sender: " + testHashHex + ", Text: \"Hello, Reticulum!\"}"
+	if msg.String() != expectedStr {
+		t.Errorf("expected string %q, got %q", expectedStr, msg.String())
+	}
+
+	msg2, _ := NewMessage(senderHash, text)
+	if !msg.Equal(msg2) {
+		t.Error("expected messages to be equal")
+	}
+
+	msg3, _ := NewMessage(senderHash, "Different text")
+	if msg.Equal(msg3) {
+		t.Error("expected messages to be different")
+	}
+}
+
+func TestNewMessageFromHex(t *testing.T) {
+	text := testMessageText
+	msg, err := NewMessageFromHex(testHashHex, text)
+	if err != nil {
+		t.Fatalf("NewMessageFromHex failed: %v", err)
+	}
+
+	if msg.FormatSenderHash() != testHashHex {
+		t.Errorf(errFmtHex, testHashHex, msg.FormatSenderHash())
+	}
+}
+
+func TestValidation(t *testing.T) {
+	// Invalid hash length
+	_, err := NewMessage([]byte{0x01}, "test")
+	if err == nil || !bytes.Contains([]byte(err.Error()), []byte("invalid hash length")) {
+		t.Errorf("expected invalid hash length error, got %v", err)
+	}
+
+	// Message too long
+	longText := make([]byte, MaxMessageSize+1)
+	for i := range longText {
+		longText[i] = 'a'
+	}
+	_, err = NewMessage(make([]byte, SenderHashLength), string(longText))
+	if err == nil || !bytes.Contains([]byte(err.Error()), []byte("message text too long")) {
+		t.Errorf("expected message text too long error, got %v", err)
+	}
+}
+
+func TestPeer_QoL(t *testing.T) {
+	hash, _ := hex.DecodeString(testHashHex)
+	peer := &Peer{
+		Hash:    hash,
+		AppData: "test user",
+	}
+
+	if err := peer.Validate(); err != nil {
+		t.Errorf("Validate failed: %v", err)
+	}
+
+	expectedStr := "Peer{Hash: " + testHashHex + ", AppData: \"test user\"}"
+	if peer.String() != expectedStr {
+		t.Errorf("expected string %q, got %q", expectedStr, peer.String())
+	}
+}
+
+func TestUtilityFunctions(t *testing.T) {
+	hash, err := SenderHashFromHex(testHashHex)
+	if err != nil {
+		t.Fatalf("SenderHashFromHex failed: %v", err)
+	}
+	if hex.EncodeToString(hash) != testHashHex {
+		t.Errorf(errFmtHex, testHashHex, hex.EncodeToString(hash))
+	}
+
+	if err := ValidateSenderHash(hash); err != nil {
+		t.Errorf("ValidateSenderHash failed: %v", err)
+	}
+
+	if err := ValidateSenderHash([]byte{0x01}); err == nil {
+		t.Error("expected error for invalid hash length")
+	}
+}
+
+func TestMessenger_SendMessage(t *testing.T) {
+	// Setup a minimal Reticulum environment
+	cfg := common.DefaultConfig()
+	tr := transport.NewTransport(cfg)
+	
+	id, _ := identity.NewIdentity()
+	dest, _ := destination.New(id, destination.IN, destination.SINGLE, "test", tr)
+	
+	m := NewMessenger(tr, dest)
+	
+	// Create a mock remote peer
+	peerId, _ := identity.NewIdentity()
+	peerHash := peerId.Hash()
+	
+	// Manually remember the identity so SendMessage can find it
+	identity.Remember([]byte("mock"), peerHash, peerId.GetPublicKey(), nil)
+	
+	// Try to send a message (it will fail to find a path, but that proves the logic works up to that point)
+	err := m.SendMessage(peerHash, "Hello!")
+	if err != nil && err.Error() != "packet sending failed: no path to destination" {
+		t.Errorf("SendMessage failed with unexpected error: %v", err)
+	}
+}
+
