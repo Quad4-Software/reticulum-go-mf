@@ -1,5 +1,5 @@
-git.quad4.io/Networks/Reticulum-Go v0.5.1-0.20251221020249-8e243a7c8b8d h1:+bNz6VjmQYSV1adG004pTvZ3jHQ6a0iAFrXOICGQXqU=
-git.quad4.io/Networks/Reticulum-Go v0.5.1-0.20251221020249-8e243a7c8b8d/go.mod h1:ytElKjs2d6UYyEyStZT/bScoSMtEqT4qT4e5eCZEflM=
+git.quad4.io/Networks/Reticulum-Go v0.6.0 h1:oLcH8JBCEHZ5I8cGqZuxlnYFfHNm1o6CixRqBALw6Og=
+git.quad4.io/Networks/Reticulum-Go v0.6.0/go.mod h1:ytElKjs2d6UYyEyStZT/bScoSMtEqT4qT4e5eCZEflM=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
