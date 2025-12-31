@@ -1,0 +1,118 @@
+version: '3'
+
+vars:
+  GOCMD: go
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  all:
+    desc: Clean, download dependencies, and test
+    deps: [clean, deps, test]
+
+  fmt:
+    desc: Format Go code
+    cmds:
+      - '{{.GOCMD}} fmt ./...'
+
+  fmt-check:
+    desc: Check if code is formatted (useful for CI)
+    cmds:
+      - '{{.GOCMD}} fmt -d ./... > fmt.diff 2>&1 || true'
+      - 'test -s fmt.diff && (echo "Code is not formatted. Run ''task fmt'' to fix." && cat fmt.diff && rm -f fmt.diff && exit 1) || (rm -f fmt.diff && exit 0)'
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - '{{.GOCMD}} vet ./...'
+
+  lint:
+    desc: Run revive linter
+    cmds:
+      - revive -config revive.toml -formatter friendly ./pkg/...
+
+  scan:
+    desc: Run gosec security scanner
+    cmds:
+      - gosec ./...
+
+  check:
+    desc: Run fmt-check, vet, lint, test-short, and scan
+    deps: [fmt-check, vet, lint, test-short, scan]
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - '{{.GOCMD}} clean'
+
+  test:
+    desc: Run tests
+    cmds:
+      - '{{.GOCMD}} test -v ./...'
+
+  test-short:
+    desc: Run short tests
+    cmds:
+      - '{{.GOCMD}} test -short -v ./...'
+
+  test-race:
+    desc: Run tests with race detector
+    cmds:
+      - '{{.GOCMD}} test -race -v ./...'
+
+  test:messenger:
+    desc: Run messenger two-way communication test
+    cmds:
+      - '{{.GOCMD}} test -v -run TestMessenger_TwoWayCommunication ./pkg/mf/...'
+
+  coverage:
+    desc: Generate test coverage report
+    cmds:
+      - '{{.GOCMD}} test -coverprofile=coverage.out ./...'
+      - '{{.GOCMD}} tool cover -html=coverage.out'
+
+  deps:
+    desc: Download and verify dependencies
+    env:
+      GOPROXY: '{{.GOPROXY | default "https://proxy.golang.org,direct"}}'
+    cmds:
+      - '{{.GOCMD}} mod download'
+      - '{{.GOCMD}} mod verify'
+
+  mod-tidy:
+    desc: Tidy go.mod file
+    cmds:
+      - '{{.GOCMD}} mod tidy'
+
+  mod-verify:
+    desc: Verify dependencies
+    cmds:
+      - '{{.GOCMD}} mod verify'
+
+  install:
+    desc: Install dependencies
+    cmds:
+      - '{{.GOCMD}} mod download'
+
+  example:
+    desc: Run basic example
+    cmds:
+      - '{{.GOCMD}} run ./examples/example.go'
+
+  example:messenger:
+    desc: Run messenger example
+    cmds:
+      - '{{.GOCMD}} run ./examples/messenger.go'
+
+  tinygo:test:
+    desc: Test compilation with TinyGo
+    cmds:
+      - tinygo test ./pkg/mf/...
+
+  tinygo:build:
+    desc: Build example with TinyGo (for testing)
+    cmds:
+      - tinygo build -o /dev/null ./examples/example.go
