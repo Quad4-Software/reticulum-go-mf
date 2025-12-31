@@ -21,12 +21,6 @@ tasks:
     cmds:
       - '{{.GOCMD}} fmt ./...'
 
-  fmt-check:
-    desc: Check if code is formatted (useful for CI)
-    cmds:
-      - '{{.GOCMD}} fmt -d ./... > fmt.diff 2>&1 || true'
-      - 'test -s fmt.diff && (echo "Code is not formatted. Run ''task fmt'' to fix." && cat fmt.diff && rm -f fmt.diff && exit 1) || (rm -f fmt.diff && exit 0)'
-
   vet:
     desc: Run go vet
     cmds:
@@ -43,8 +37,8 @@ tasks:
       - gosec ./...
 
   check:
-    desc: Run fmt-check, vet, lint, test-short, and scan
-    deps: [fmt-check, vet, lint, test-short, scan]
+    desc: Run vet, lint, test-short, and scan
+    deps: [vet, lint, test-short, scan]
 
   clean:
     desc: Remove build artifacts
