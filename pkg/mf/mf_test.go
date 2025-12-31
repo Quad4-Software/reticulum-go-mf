@@ -164,12 +164,13 @@ func TestMessenger_SendMessage(t *testing.T) {
 	
 	m := NewMessenger(tr, dest)
 	
-	// Create a mock remote peer
+	// Create a mock remote peer with a destination
 	peerId, _ := identity.NewIdentity()
-	peerHash := peerId.Hash()
+	peerDest, _ := destination.New(peerId, destination.IN, destination.SINGLE, "test", tr)
+	peerHash := peerDest.GetHash()
 	
 	// Manually remember the identity so SendMessage can find it
-	identity.Remember([]byte("mock"), peerHash, peerId.GetPublicKey(), nil)
+	identity.Remember(nil, peerHash, peerId.GetPublicKey(), nil)
 	
 	// Try to send a message (it will fail to find a path, but that proves the logic works up to that point)
 	err := m.SendMessage(peerHash, "Hello!")
