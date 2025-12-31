@@ -1,5 +1,8 @@
 version: '3'
 
+env:
+  GOPRIVATE: git.quad4.io
+
 vars:
   GOCMD: go
 
