@@ -1,6 +1,16 @@
 # reticulum-go-mf
 
-A message format for Reticulum-Go.
+A message format for Reticulum-Go. The repository ships two
+complementary packages:
+
+- `pkg/mf` - the lightweight native MF format, optimised for size and
+  for use cases where the wire layout is fully under your control.
+- `pkg/lxmf` - a wire-compatible implementation of the LXMF protocol
+  used by the broader Reticulum ecosystem, so a Go peer can exchange
+  messages with any other LXMF client.
+
+Both packages run on top of the same Reticulum-Go transport, so a
+single application can serve MF and LXMF traffic side by side.
 
 ## Installation
 
@@ -45,7 +55,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	dest, err := destination.New(id, destination.IN, destination.SINGLE, "mf", tr)
+	dest, err := destination.New(id, destination.In, destination.Single, "mf", tr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -123,10 +133,79 @@ if err != nil {
 }
 ```
 
+## LXMF
+
+The `pkg/lxmf` package implements the LXMF protocol on top of
+Reticulum-Go. The wire format is byte-for-byte compatible with other
+LXMF clients, so messages can be exchanged with any LXMF peer.
+
+```go
+package main
+
+import (
+    "log"
+
+    "git.quad4.io/RNS-Things/reticulum-go-mf/pkg/lxmf"
+    "git.quad4.io/Networks/Reticulum-Go/pkg/common"
+    "git.quad4.io/Networks/Reticulum-Go/pkg/identity"
+    "git.quad4.io/Networks/Reticulum-Go/pkg/transport"
+)
+
+func main() {
+    cfg := common.DefaultConfig()
+    tr := transport.NewTransport(cfg)
+    if err := tr.Start(); err != nil {
+        log.Fatal(err)
+    }
+
+    id, _ := identity.NewIdentity()
+    messenger, err := lxmf.NewDeliveryMessenger(id, tr)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    messenger.SetMessageHandler(func(m *lxmf.LXMessage, _ common.NetworkInterface) {
+        log.Printf("inbound %s: %q", m.FormatHash(), m.ContentString())
+    })
+
+    if err := messenger.Destination().Announce(false, nil, nil); err != nil {
+        log.Printf("announce failed: %v", err)
+    }
+}
+```
+
+`NewDeliveryMessenger` builds an inbound `lxmf.delivery` destination so
+that the resulting destination hash matches the hash other LXMF
+implementations would compute for the same identity.
+
+The package also exposes lower-level primitives:
+
+- `lxmf.NewMessage` and `lxmf.LXMessage.Pack` for assembling and
+  signing a message manually.
+- `lxmf.Unpack` and `lxmf.UnpackFromBytes` for parsing packed bytes
+  arriving outside of the `Messenger` flow.
+- `lxmf.DisplayNameFromAppData`, `lxmf.StampCostFromAppData` and the
+  `EncodeAnnounceAppData*` helpers for the announce metadata format.
+
+### Interoperability tests
+
+Wire compatibility with the upstream Python implementation is verified
+by `pkg/lxmf/interop_test.go`, which uses `uv` to run a helper script
+against the official `lxmf` Python package for both the encode and the
+decode path. Run them with:
+
+```
+task test:lxmf:interop
+```
+
+The interop tests are skipped automatically when `uv` is not on
+`$PATH` or when `-short` is passed.
+
 ## Prerequisites
 
-- Go 1.24 or later
+- Go 1.26.2 or later
 - [Task](https://taskfile.dev/) for build automation
+- `uv` (optional, only required for the LXMF Go-Python interop tests)
 
 Note: You may need to set `alias task='go-task'` in your shell configuration to use `task` instead of `go-task`.
 
