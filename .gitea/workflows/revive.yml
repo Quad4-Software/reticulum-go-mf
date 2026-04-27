@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GOFLAGS: -mod=vendor
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -24,7 +27,7 @@ jobs:
       - name: Set up Go
         uses: https://git.quad4.io/actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00
         with:
-          go-version: '1.25'
+          go-version: '1.26.2'
 
       - name: Setup Task
         uses: https://git.quad4.io/actions/setup-task@0ab1b2a65bc55236a3bc64cde78f80e20e8885c2 # v1
@@ -32,6 +35,8 @@ jobs:
           version: '3.46.3'
 
       - name: Install revive
+        env:
+          GOFLAGS: ''
         run: go install github.com/mgechev/revive@latest
 
       - name: Run lint

@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GOFLAGS: -mod=vendor
+
 jobs:
   test:
     name: Test (${{ matrix.os }}, ${{ matrix.goarch }})
@@ -33,7 +36,7 @@ jobs:
       - name: Set up Go
         uses: https://git.quad4.io/actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
-          go-version: '1.24'
+          go-version: '1.26.2'
 
       - name: Setup Task
         uses: https://git.quad4.io/actions/setup-task@0ab1b2a65bc55236a3bc64cde78f80e20e8885c2 # v1
@@ -46,14 +49,22 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
+            vendor
+          key: ${{ runner.os }}-go-${{ matrix.goarch }}-vendor-${{ hashFiles('go.sum', 'vendor/modules.txt') }}
           restore-keys: |
-            ${{ runner.os }}-go-${{ matrix.goarch }}-
+            ${{ runner.os }}-go-${{ matrix.goarch }}-vendor-
 
       - name: Install dependencies
+        env:
+          GOFLAGS: ''
         run: |
           go install github.com/mgechev/revive@latest
           go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Verify vendored tree matches go.mod
+        run: |
+          go mod vendor
+          git diff --exit-code -- go.mod go.sum vendor/
 
       - name: Run code quality checks
         run: task check
