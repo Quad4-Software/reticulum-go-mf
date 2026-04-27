@@ -135,9 +135,17 @@ if err != nil {
 
 ## LXMF
 
-The `pkg/lxmf` package implements the LXMF protocol on top of
-Reticulum-Go. The wire format is byte-for-byte compatible with other
-LXMF clients, so messages can be exchanged with any LXMF peer.
+`pkg/lxmf` implements the LXMF message layer on top of Reticulum-Go: packing
+and signing, opportunistic delivery, stamps (proof-of-work), paper message
+URIs, optional container wrapping, and lxmd-style INI config parsing. The
+`Messenger` type ties this to a standard `lxmf` / `lxmf.delivery` inbound
+destination so the local hash matches what other stacks derive for the
+same identity.
+
+The implementation tracks upstream LXMF semantics (version constant in
+`pkg/lxmf`); the wire layout matches the ecosystem format so a Go process
+can exchange traffic with **lxmd**, the Python `lxmf` client, and other
+RNS tools that speak LXMF on the same Reticulum network.
 
 ```go
 package main
@@ -187,37 +195,29 @@ The package also exposes lower-level primitives:
 - `lxmf.DisplayNameFromAppData`, `lxmf.StampCostFromAppData` and the
   `EncodeAnnounceAppData*` helpers for the announce metadata format.
 
-### Interoperability tests
+**Examples** — A two-local-UDP hop demo: `task example:lxmf`. A terminal
+chat (hub, split panes, optional remote): `task example:lxmf:tui`.
 
-Wire compatibility with the upstream Python implementation is verified
-by `pkg/lxmf/interop_test.go`, which uses `uv` to run a helper script
-against the official `lxmf` Python package for both the encode and the
-decode path. Run them with:
+**Tests** — Run the full LXMF test suite (unit, pack/unpack, stamps,
+messenger loopback) with `task test:lxmf` or `go test ./pkg/lxmf/...`.
 
-```
-task test:lxmf:interop
-```
-
-The interop tests are skipped automatically when `uv` is not on
-`$PATH` or when `-short` is passed.
+**Interop** — The package is written for the same on-wire behaviour as
+the reference Python stack, so a Go node can hand messages to and from
+`lxmd` and other LXMF software on a shared Reticulum mesh. The repository
+may also ship optional `TestInterop` checks that call into Python; those
+are run with `task test:lxmf:interop` and need `uv` and the `lxmf`
+package available when that test is present. If that test is not in your
+tree, the task simply runs no interop-matching cases.
 
 ## Prerequisites
 
 - Go 1.26.2 or later
 - [Task](https://taskfile.dev/) for build automation
-- `uv` (optional, only required for the LXMF Go-Python interop tests)
+- `uv` (optional, only for optional LXMF Python interop tests when
+  `TestInterop` exists)
 
-Note: You may need to set `alias task='go-task'` in your shell configuration to use `task` instead of `go-task`.
-
-### Nix
-
-If you have Nix installed, you can use the development shell which automatically provides all dependencies including Task:
-
-```bash
-nix develop
-```
-
-This will enter a development environment with Go and Task pre-configured.
+You may set `alias task='go-task'` in your shell if you invoke Task as
+`go-task` on your system.
 
 ## Development
 
@@ -229,7 +229,7 @@ Format code:
 task fmt
 ```
 
-Run static analysis checks (formatting, vet, linting):
+Run the combined check (vet, lint, short tests, gosec scan):
 
 ```bash
 task check
@@ -259,26 +259,35 @@ task coverage
 
 The project uses [Task](https://taskfile.dev/) for all development and build operations.
 
-| Task                | Description                                          |
-|---------------------|------------------------------------------------------|
-| default             | Show available tasks                                 |
-| all                 | Clean, download dependencies, and test              |
-| fmt                 | Format Go code                                       |
-| fmt-check           | Check if code is formatted (CI-friendly)             |
-| vet                 | Run go vet                                           |
-| lint                | Run revive linter                                    |
-| scan                | Run gosec security scanner                           |
-| check               | Run fmt-check, vet, and lint                         |
-| clean               | Remove build artifacts                               |
-| test                | Run all tests                                        |
-| test-short          | Run short tests only                                 |
-| test-race           | Run tests with race detector                         |
-| coverage            | Generate test coverage report                        |
-| deps                | Download and verify dependencies                     |
-| mod-tidy            | Tidy go.mod file                                     |
-| mod-verify          | Verify dependencies                                  |
-
-example: task test
+| Task                 | Description                                         |
+|----------------------|-----------------------------------------------------|
+| default              | Show available tasks                                |
+| all                  | Clean, download dependencies, and test              |
+| fmt                  | Format Go code                                      |
+| vet                  | Run go vet                                          |
+| lint                 | Run revive linter                                   |
+| scan                 | Run gosec security scanner                          |
+| check                | Run vet, lint, test-short, and scan                 |
+| clean                | Remove build artifacts                              |
+| test                 | Run all tests                                       |
+| test-short           | Run short tests only                                |
+| test-race            | Run tests with race detector                        |
+| test:lxmf            | Run all LXMF package tests                          |
+| test:lxmf:interop    | Run `TestInterop` (optional; needs `uv` if used)     |
+| test:messenger       | Run MF two-way messenger test                       |
+| bench                | Run benchmarks (lxmf, mf)                           |
+| stress               | Run stress tests                                    |
+| fuzz                 | Run fuzz targets (see `scripts/run-fuzz.sh`)        |
+| coverage             | Generate test coverage report                       |
+| deps                 | Download, verify, and refresh `vendor/`             |
+| vendor               | Regenerate `vendor/`                              |
+| mod-tidy             | Tidy go.mod file                                    |
+| mod-verify           | Verify dependencies                                 |
+| example              | Run basic MF example                                |
+| example:messenger    | Run MF messenger example                            |
+| example:lxmf         | Run two-local-UDP LXMF example                      |
+| example:lxmf:tui     | Run LXMF terminal chat example                    |
+| tinygo:test / build  | TinyGo test or build of MF example                  |
 
 ## License
 
