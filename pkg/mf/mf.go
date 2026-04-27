@@ -10,13 +10,13 @@ import (
 	"git.quad4.io/Networks/Reticulum-Go/pkg/transport"
 )
 
-// Message represents a basic chat message in the Reticulum-Go WASM format.
+// Message is a compact MF wire format: sender hash plus UTF-8 text.
 type Message struct {
 	SenderHash []byte
 	Text       string
 }
 
-// NewMessage creates a new Message with validation.
+// NewMessage validates and returns a Message.
 func NewMessage(senderHash []byte, text string) (*Message, error) {
 	m := &Message{
 		SenderHash: senderHash,
@@ -28,7 +28,7 @@ func NewMessage(senderHash []byte, text string) (*Message, error) {
 	return m, nil
 }
 
-// NewMessageFromHex creates a new Message from a hex-encoded sender hash.
+// NewMessageFromHex parses the sender hash from hex then calls NewMessage.
 func NewMessageFromHex(senderHashHex string, text string) (*Message, error) {
 	hash, err := hex.DecodeString(senderHashHex)
 	if err != nil {
@@ -37,7 +37,7 @@ func NewMessageFromHex(senderHashHex string, text string) (*Message, error) {
 	return NewMessage(hash, text)
 }
 
-// Validate checks if the message is valid.
+// Validate checks hash length and text size.
 func (m *Message) Validate() error {
 	if len(m.SenderHash) != SenderHashLength {
 		return fmt.Errorf(errFmtExpected, ErrInvalidHashLength, SenderHashLength, len(m.SenderHash))
@@ -48,22 +48,21 @@ func (m *Message) Validate() error {
 	return nil
 }
 
-// Len returns the length of the packed message in bytes.
+// Len returns packed size: SenderHashLength + len(text).
 func (m *Message) Len() int {
 	return SenderHashLength + len(m.Text)
 }
 
-// FormatSenderHash returns the hexadecimal representation of the sender hash.
+// FormatSenderHash hex-encodes the sender hash.
 func (m *Message) FormatSenderHash() string {
 	return hex.EncodeToString(m.SenderHash)
 }
 
-// String returns a string representation of the message for debugging.
 func (m *Message) String() string {
 	return fmt.Sprintf("Message{Sender: %s, Text: %q}", m.FormatSenderHash(), m.Text)
 }
 
-// Equal reports whether m and other are equal.
+// Equal compares sender hash and text.
 func (m *Message) Equal(other *Message) bool {
 	if other == nil {
 		return false
@@ -82,8 +81,7 @@ func (m *Message) Equal(other *Message) bool {
 	return true
 }
 
-// Pack serializes the message into a byte slice.
-// The format is: [16 bytes sender hash][text payload]
+// Pack returns [16-byte sender hash][UTF-8 text].
 func (m *Message) Pack() ([]byte, error) {
 	if err := m.Validate(); err != nil {
 		return nil, err
@@ -94,7 +92,7 @@ func (m *Message) Pack() ([]byte, error) {
 	return payload, nil
 }
 
-// Unpack parses a byte slice into a Message.
+// Unpack parses Pack output.
 func Unpack(data []byte) (*Message, error) {
 	if len(data) < SenderHashLength {
 		return nil, fmt.Errorf("%w: minimum %d bytes for sender hash", ErrMessageTooShort, SenderHashLength)
@@ -107,13 +105,13 @@ func Unpack(data []byte) (*Message, error) {
 	return NewMessage(senderHash, text)
 }
 
-// Peer represents a discovered peer in the network.
+// Peer is a discovered peer hash plus app data string.
 type Peer struct {
 	Hash    []byte
 	AppData string
 }
 
-// Validate checks if the peer is valid.
+// Validate checks hash length.
 func (p *Peer) Validate() error {
 	if len(p.Hash) != SenderHashLength {
 		return fmt.Errorf(errFmtExpected, ErrInvalidHashLength, SenderHashLength, len(p.Hash))
@@ -121,23 +119,22 @@ func (p *Peer) Validate() error {
 	return nil
 }
 
-// FormatHash returns the hexadecimal representation of the peer's hash.
+// FormatHash hex-encodes the peer hash.
 func (p *Peer) FormatHash() string {
 	return hex.EncodeToString(p.Hash)
 }
 
-// String returns a string representation of the peer for debugging.
 func (p *Peer) String() string {
 	return fmt.Sprintf("Peer{Hash: %s, AppData: %q}", p.FormatHash(), p.AppData)
 }
 
-// Messenger handles sending and receiving MF messages over Reticulum.
+// Messenger sends MF over a Reticulum transport and inbound destination.
 type Messenger struct {
 	transport *transport.Transport
 	dest      *destination.Destination
 }
 
-// NewMessenger creates a new Messenger instance.
+// NewMessenger wraps a transport and destination.
 func NewMessenger(t *transport.Transport, d *destination.Destination) *Messenger {
 	return &Messenger{
 		transport: t,
@@ -145,17 +142,17 @@ func NewMessenger(t *transport.Transport, d *destination.Destination) *Messenger
 	}
 }
 
-// GetDestinationHash returns the local destination hash.
+// GetDestinationHash returns the local destination hash bytes.
 func (m *Messenger) GetDestinationHash() []byte {
 	return m.dest.GetHash()
 }
 
-// GetDestination returns the internal Reticulum destination.
+// GetDestination returns the local RNS destination.
 func (m *Messenger) GetDestination() *destination.Destination {
 	return m.dest
 }
 
-// SendMessage sends a text message to a specific destination hash.
+// SendMessage encrypts and sends one MF packet to destHash.
 func (m *Messenger) SendMessage(destHash []byte, text string) error {
 	if len(destHash) != SenderHashLength {
 		return fmt.Errorf("invalid destination hash: %w", ErrInvalidHashLength)
@@ -166,7 +163,7 @@ func (m *Messenger) SendMessage(destHash []byte, text string) error {
 		return fmt.Errorf("identity not found: %w", err)
 	}
 
-	targetDest, err := destination.FromHash(destHash, remoteIdentity, destination.SINGLE, m.transport)
+	targetDest, err := destination.FromHash(destHash, remoteIdentity, destination.Single, m.transport)
 	if err != nil {
 		return fmt.Errorf("failed to create target destination: %w", err)
 	}
@@ -210,7 +207,7 @@ func (m *Messenger) SendMessage(destHash []byte, text string) error {
 	return nil
 }
 
-// SenderHashFromHex decodes a hex string to a sender hash byte slice.
+// SenderHashFromHex decodes a 32-byte hex sender hash.
 func SenderHashFromHex(s string) ([]byte, error) {
 	hash, err := hex.DecodeString(s)
 	if err != nil {
@@ -222,7 +219,7 @@ func SenderHashFromHex(s string) ([]byte, error) {
 	return hash, nil
 }
 
-// ValidateSenderHash checks if the sender hash is valid.
+// ValidateSenderHash checks length == SenderHashLength.
 func ValidateSenderHash(hash []byte) error {
 	if len(hash) != SenderHashLength {
 		return fmt.Errorf(errFmtExpected, ErrInvalidHashLength, SenderHashLength, len(hash))

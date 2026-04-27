@@ -158,24 +158,23 @@ func TestMessenger_SendMessage(t *testing.T) {
 	// Setup a minimal Reticulum environment
 	cfg := common.DefaultConfig()
 	tr := transport.NewTransport(cfg)
-	
+
 	id, _ := identity.NewIdentity()
-	dest, _ := destination.New(id, destination.IN, destination.SINGLE, "test", tr)
-	
+	dest, _ := destination.New(id, destination.In, destination.Single, "test", tr)
+
 	m := NewMessenger(tr, dest)
-	
+
 	// Create a mock remote peer with a destination
 	peerId, _ := identity.NewIdentity()
-	peerDest, _ := destination.New(peerId, destination.IN, destination.SINGLE, "test", tr)
+	peerDest, _ := destination.New(peerId, destination.In, destination.Single, "test", tr)
 	peerHash := peerDest.GetHash()
-	
+
 	// Manually remember the identity so SendMessage can find it
 	identity.Remember(nil, peerHash, peerId.GetPublicKey(), nil)
-	
+
 	// Try to send a message (it will fail to find a path, but that proves the logic works up to that point)
 	err := m.SendMessage(peerHash, "Hello!")
 	if err != nil && err.Error() != "packet sending failed: no path to destination" {
 		t.Errorf("SendMessage failed with unexpected error: %v", err)
 	}
 }
-

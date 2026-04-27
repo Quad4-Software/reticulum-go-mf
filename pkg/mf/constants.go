@@ -3,29 +3,20 @@ package mf
 import "errors"
 
 const (
-	// SenderHashLength is the required length in bytes for a sender hash.
+	// SenderHashLength is the sender hash size in bytes.
 	SenderHashLength = 16
-
-	// MaxMessageSize is the maximum text size allowed in a message to fit within Reticulum MTU.
-	// Calculated as MTU (500) - MaxHeaderSize (64) - SenderHashLength (16).
+	// MaxMessageSize is max text length (MTU 500 − header 64 − SenderHashLength 16).
 	MaxMessageSize = 420
 
-	// testHashHex is a test hash used in unit tests.
-	testHashHex = "0123456789abcdef0123456789abcdef"
-
-	// errFmtExpected is a common error format string.
+	testHashHex    = "0123456789abcdef0123456789abcdef"
 	errFmtExpected = "%w: expected %d, got %d"
 )
 
 var (
-	// ErrInvalidHashLength is returned when a hash has an incorrect length.
+	// ErrInvalidHashLength means the hash length is not SenderHashLength.
 	ErrInvalidHashLength = errors.New("invalid hash length")
-
-	// ErrMessageTooShort is returned when message data is too short to be unpacked.
+	// ErrMessageTooShort means the buffer is shorter than SenderHashLength.
 	ErrMessageTooShort = errors.New("message too short")
-
-	// ErrMessageTooLong is returned when message text exceeds MaxMessageSize.
+	// ErrMessageTooLong means text exceeds MaxMessageSize.
 	ErrMessageTooLong = errors.New("message text too long")
 )
-
-

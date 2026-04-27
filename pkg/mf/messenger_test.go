@@ -110,12 +110,12 @@ func TestMessenger_TwoWayCommunication(t *testing.T) {
 		t.Fatalf("Failed to create identity 2: %v", err)
 	}
 
-	dest1, err := destination.New(id1, destination.IN, destination.SINGLE, testAppName, tr1)
+	dest1, err := destination.New(id1, destination.In, destination.Single, testAppName, tr1)
 	if err != nil {
 		t.Fatalf("Failed to create destination 1: %v", err)
 	}
 
-	dest2, err := destination.New(id2, destination.IN, destination.SINGLE, testAppName, tr2)
+	dest2, err := destination.New(id2, destination.In, destination.Single, testAppName, tr2)
 	if err != nil {
 		t.Fatalf("Failed to create destination 2: %v", err)
 	}
@@ -178,18 +178,17 @@ func TestMessenger_TwoWayCommunication(t *testing.T) {
 func TestMessenger_QoL(t *testing.T) {
 	cfg := common.DefaultConfig()
 	tr := transport.NewTransport(cfg)
-	
+
 	id, _ := identity.NewIdentity()
-	dest, _ := destination.New(id, destination.IN, destination.SINGLE, testAppName, tr)
-	
+	dest, _ := destination.New(id, destination.In, destination.Single, testAppName, tr)
+
 	m := NewMessenger(tr, dest)
-	
+
 	if !bytes.Equal(m.GetDestinationHash(), dest.GetHash()) {
 		t.Error("GetDestinationHash returned incorrect hash")
 	}
-	
+
 	if m.GetDestination() != dest {
 		t.Error("GetDestination returned incorrect destination")
 	}
 }
-
