@@ -2,6 +2,7 @@ version: '3'
 
 env:
   GOPRIVATE: git.quad4.io
+  GOFLAGS: -mod=vendor
 
 vars:
   GOCMD: go
@@ -60,10 +61,40 @@ tasks:
     cmds:
       - '{{.GOCMD}} test -race -v ./...'
 
+  test-race:packages:
+    desc: Race detector for lxmf, mf, and leaktest (uses -short; skips interop and heavy tests)
+    cmds:
+      - '{{.GOCMD}} test -race -short -count=1 -timeout 15m ./internal/leaktest/... ./pkg/lxmf/... ./pkg/mf/...'
+
+  bench:
+    desc: Run benchmarks for lxmf and mf
+    cmds:
+      - "{{.GOCMD}} test -bench=. -benchmem -count=3 -run=^$$ ./pkg/lxmf/... ./pkg/mf/..."
+
+  stress:
+    desc: Run stress tests (skipped with -short)
+    cmds:
+      - "{{.GOCMD}} test -count=1 -timeout 15m -run=Stress ./pkg/lxmf/... ./pkg/mf/..."
+
+  fuzz:
+    desc: Run all fuzz targets (FUZZTIME per target, default 15s; see scripts/run-fuzz.sh)
+    cmds:
+      - bash scripts/run-fuzz.sh
+
   test:messenger:
     desc: Run messenger two-way communication test
     cmds:
       - '{{.GOCMD}} test -v -run TestMessenger_TwoWayCommunication ./pkg/mf/...'
+
+  test:lxmf:
+    desc: Run all LXMF unit and loopback tests
+    cmds:
+      - '{{.GOCMD}} test -v -count=1 ./pkg/lxmf/...'
+
+  test:lxmf:interop:
+    desc: Run LXMF Go-Python interop tests via uv
+    cmds:
+      - '{{.GOCMD}} test -v -count=1 -run TestInterop ./pkg/lxmf/...'
 
   coverage:
     desc: Generate test coverage report
@@ -72,25 +103,40 @@ tasks:
       - '{{.GOCMD}} tool cover -html=coverage.out'
 
   deps:
-    desc: Download and verify dependencies
+    desc: Download, verify, and refresh vendor/ for offline builds
     env:
       GOPROXY: '{{.GOPROXY | default "https://proxy.golang.org,direct"}}'
+      GOFLAGS: ''
     cmds:
       - '{{.GOCMD}} mod download'
       - '{{.GOCMD}} mod verify'
+      - '{{.GOCMD}} mod vendor'
+
+  vendor:
+    desc: Regenerate vendor/ from go.mod (clears -mod=vendor for this command)
+    env:
+      GOFLAGS: ''
+    cmds:
+      - '{{.GOCMD}} mod vendor'
 
   mod-tidy:
     desc: Tidy go.mod file
+    env:
+      GOFLAGS: ''
     cmds:
       - '{{.GOCMD}} mod tidy'
 
   mod-verify:
     desc: Verify dependencies
+    env:
+      GOFLAGS: ''
     cmds:
       - '{{.GOCMD}} mod verify'
 
   install:
     desc: Install dependencies
+    env:
+      GOFLAGS: ''
     cmds:
       - '{{.GOCMD}} mod download'
 
@@ -103,6 +149,16 @@ tasks:
     desc: Run messenger example
     cmds:
       - '{{.GOCMD}} run ./examples/messenger.go'
+
+  example:lxmf:
+    desc: Run LXMF messenger example
+    cmds:
+      - '{{.GOCMD}} run ./examples/lxmf_messenger.go'
+
+  example:lxmf:tui:
+    desc: Run ephemeral LXMF terminal chat (hub + split panes)
+    cmds:
+      - '{{.GOCMD}} run ./examples/lxmf_tui_chat.go'
 
   tinygo:test:
     desc: Test compilation with TinyGo
