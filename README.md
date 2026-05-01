@@ -1,4 +1,4 @@
-# reticulum-go-mf
+# Reticulum-Go Message Formats Library
 
 A message format for Reticulum-Go. The repository ships two
 complementary packages:
