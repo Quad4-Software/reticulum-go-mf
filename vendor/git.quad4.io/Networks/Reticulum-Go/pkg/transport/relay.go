@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: 0BSD
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2024-2026 Quad4.io
 package transport
 
@@ -69,6 +69,22 @@ func (lt *linkRelayTable) sweep(maxIdle time.Duration) int {
 		}
 	}
 	return removed
+}
+
+func (lt *linkRelayTable) removeEntriesReferencing(iface common.NetworkInterface) {
+	if lt == nil || iface == nil {
+		return
+	}
+	lt.mu.Lock()
+	defer lt.mu.Unlock()
+	for k, e := range lt.entries {
+		if e == nil {
+			continue
+		}
+		if e.NextHopIface == iface || e.ReceivedIface == iface {
+			delete(lt.entries, k)
+		}
+	}
 }
 
 func (t *Transport) transportEnabled() bool {

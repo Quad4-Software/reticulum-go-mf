@@ -180,7 +180,12 @@ func (m *Messenger) onPacket(plaintext []byte, iface common.NetworkInterface) {
 
 	msg, err := UnpackFromBytes(m.DestinationHash(), plaintext, resolver)
 	if err != nil && msg == nil {
+		Warning("inbound lxmf unpack failed", "error", err, "plaintext_len", len(plaintext))
 		return
+	}
+	if err != nil {
+		Debug("inbound lxmf unpack completed with error", "error", err,
+			"signature_validated", msg.SignatureValidated, "unverified_reason", msg.UnverifiedReason)
 	}
 
 	handler(msg, iface)

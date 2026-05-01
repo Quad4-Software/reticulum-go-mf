@@ -7,7 +7,7 @@ git.quad4.io/Go-Libs/msgpack/v5/pkg/msgpack/msgpcode
 git.quad4.io/Go-Libs/tagparser/v2/internal
 git.quad4.io/Go-Libs/tagparser/v2/internal/parser
 git.quad4.io/Go-Libs/tagparser/v2/pkg/tagparser
-# git.quad4.io/Networks/Reticulum-Go v0.9.1
+# git.quad4.io/Networks/Reticulum-Go v0.9.3-0.20260430070912-1d7c3e84ac8c
 ## explicit; go 1.26.2
 git.quad4.io/Networks/Reticulum-Go/pkg/announce
 git.quad4.io/Networks/Reticulum-Go/pkg/blackhole
