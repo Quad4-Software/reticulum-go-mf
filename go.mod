@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	git.quad4.io/Go-Libs/msgpack/v5 v5.6.1
-	git.quad4.io/Networks/Reticulum-Go v0.9.1
+	git.quad4.io/Networks/Reticulum-Go v0.9.2
 	golang.org/x/term v0.42.0
 )
 
