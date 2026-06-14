@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"git.quad4.io/Networks/Reticulum-Go/pkg/common"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/identity"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/interfaces"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/transport"
+	"quad4/reticulum-go/pkg/common"
+	"quad4/reticulum-go/pkg/identity"
+	"quad4/reticulum-go/pkg/interfaces"
+	"quad4/reticulum-go/pkg/transport"
 )
 
 const (

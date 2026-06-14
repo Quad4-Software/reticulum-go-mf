@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"git.quad4.io/Go-Libs/msgpack/v5/pkg/msgpack"
+	"quad4/msgpack/v5/pkg/msgpack"
 )
 
 // Container is msgpack packed_container metadata plus raw LXMF bytes (wire-compatible with upstream).

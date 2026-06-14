@@ -4,10 +4,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"git.quad4.io/Networks/Reticulum-Go/pkg/destination"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/identity"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/packet"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/transport"
+	"quad4/reticulum-go/pkg/destination"
+	"quad4/reticulum-go/pkg/identity"
+	"quad4/reticulum-go/pkg/packet"
+	"quad4/reticulum-go/pkg/transport"
 )
 
 // Message is a compact MF wire format: sender hash plus UTF-8 text.

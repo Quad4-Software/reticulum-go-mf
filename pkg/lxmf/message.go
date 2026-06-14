@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"time"
 
-	"git.quad4.io/Go-Libs/msgpack/v5/pkg/msgpack"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/identity"
+	"quad4/msgpack/v5/pkg/msgpack"
+	"quad4/reticulum-go/pkg/identity"
 )
 
 // Signer signs packed message bytes (implemented by identity.Identity and similar).

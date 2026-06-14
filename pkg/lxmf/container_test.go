@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"git.quad4.io/Networks/Reticulum-Go/pkg/identity"
+	"quad4/reticulum-go/pkg/identity"
 )
 
 func TestPackContainer_RoundTrip(t *testing.T) {

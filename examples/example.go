@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"log"
 
-	"git.quad4.io/RNS-Things/reticulum-go-mf/pkg/mf"
+	"quad4/reticulum-go-mf/pkg/mf"
 )
 
 const (

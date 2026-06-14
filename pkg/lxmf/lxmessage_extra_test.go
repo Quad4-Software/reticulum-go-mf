@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"git.quad4.io/Networks/Reticulum-Go/pkg/identity"
+	"quad4/reticulum-go/pkg/identity"
 )
 
 func TestLXMessage_StringAndAccessors(t *testing.T) {

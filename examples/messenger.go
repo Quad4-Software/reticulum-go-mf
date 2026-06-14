@@ -8,12 +8,12 @@ import (
 	"log"
 	"time"
 
-	"git.quad4.io/RNS-Things/reticulum-go-mf/pkg/mf"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/common"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/destination"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/identity"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/interfaces"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/transport"
+	"quad4/reticulum-go-mf/pkg/mf"
+	"quad4/reticulum-go/pkg/common"
+	"quad4/reticulum-go/pkg/destination"
+	"quad4/reticulum-go/pkg/identity"
+	"quad4/reticulum-go/pkg/interfaces"
+	"quad4/reticulum-go/pkg/transport"
 )
 
 const (

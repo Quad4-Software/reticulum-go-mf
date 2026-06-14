@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"git.quad4.io/Go-Libs/msgpack/v5/pkg/msgpack"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/cryptography"
+	"quad4/msgpack/v5/pkg/msgpack"
+	"quad4/reticulum-go/pkg/cryptography"
 )
 
 // Workblock expansion rounds (aligned with LXStamper).

@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	rnsdebug "git.quad4.io/Networks/Reticulum-Go/pkg/debug"
+	rnsdebug "quad4/reticulum-go/pkg/debug"
 )
 
 // Log levels match RNS debug (1–7) so one -debug flag can control both stacks.

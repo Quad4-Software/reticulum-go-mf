@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"git.quad4.io/Networks/Reticulum-Go/pkg/identity"
-	"git.quad4.io/RNS-Things/reticulum-go-mf/internal/leaktest"
+	"quad4/reticulum-go/pkg/identity"
+	"quad4/reticulum-go-mf/internal/leaktest"
 )
 
 func TestLeak_LXMF_PackUnpack(t *testing.T) {

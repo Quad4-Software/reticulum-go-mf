@@ -15,7 +15,7 @@ single application can serve MF and LXMF traffic side by side.
 ## Installation
 
 ```bash
-go get git.quad4.io/RNS-Things/reticulum-go-mf
+go get quad4/reticulum-go-mf
 ```
 
 ## Usage
@@ -32,11 +32,11 @@ import (
 	"log"
 	"time"
 
-	"git.quad4.io/RNS-Things/reticulum-go-mf/pkg/mf"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/common"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/destination"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/identity"
-	"git.quad4.io/Networks/Reticulum-Go/pkg/transport"
+	"quad4/reticulum-go-mf/pkg/mf"
+	"quad4/reticulum-go/pkg/common"
+	"quad4/reticulum-go/pkg/destination"
+	"quad4/reticulum-go/pkg/identity"
+	"quad4/reticulum-go/pkg/transport"
 )
 
 func main() {
@@ -111,7 +111,7 @@ func sendMessageWithRetry(messenger *mf.Messenger, tr *transport.Transport,
 You can also use the `Message` struct directly for manual formatting.
 
 ```go
-import "git.quad4.io/RNS-Things/reticulum-go-mf/pkg/mf"
+import "quad4/reticulum-go-mf/pkg/mf"
 
 // Create a message
 senderHash, _ := hex.DecodeString("0123456789abcdef0123456789abcdef")
@@ -153,10 +153,10 @@ package main
 import (
     "log"
 
-    "git.quad4.io/RNS-Things/reticulum-go-mf/pkg/lxmf"
-    "git.quad4.io/Networks/Reticulum-Go/pkg/common"
-    "git.quad4.io/Networks/Reticulum-Go/pkg/identity"
-    "git.quad4.io/Networks/Reticulum-Go/pkg/transport"
+    "quad4/reticulum-go-mf/pkg/lxmf"
+    "quad4/reticulum-go/pkg/common"
+    "quad4/reticulum-go/pkg/identity"
+    "quad4/reticulum-go/pkg/transport"
 )
 
 func main() {

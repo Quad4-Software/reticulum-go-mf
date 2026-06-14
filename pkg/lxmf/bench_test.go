@@ -4,7 +4,7 @@ package lxmf
 import (
 	"testing"
 
-	"git.quad4.io/Networks/Reticulum-Go/pkg/identity"
+	"quad4/reticulum-go/pkg/identity"
 )
 
 func BenchmarkLXMF_Pack(b *testing.B) {

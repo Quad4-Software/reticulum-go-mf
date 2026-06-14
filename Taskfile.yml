@@ -1,8 +1,9 @@
 version: '3'
 
 env:
-  GOPRIVATE: git.quad4.io
   GOFLAGS: -mod=vendor
+  GOPROXY: 'off'
+  GOSUMDB: 'off'
 
 vars:
   GOCMD: go
@@ -103,14 +104,12 @@ tasks:
       - '{{.GOCMD}} tool cover -html=coverage.out'
 
   deps:
-    desc: Download, verify, and refresh vendor/ for offline builds
+    desc: Tidy go.mod and refresh vendor/ from local replaces (offline)
     env:
-      GOPROXY: '{{.GOPROXY | default "https://proxy.golang.org,direct"}}'
       GOFLAGS: ''
     cmds:
-      - '{{.GOCMD}} mod download'
-      - '{{.GOCMD}} mod verify'
-      - '{{.GOCMD}} mod vendor'
+      - env GOWORK=off {{.GOCMD}} mod tidy
+      - env GOWORK=off {{.GOCMD}} mod vendor
 
   vendor:
     desc: Regenerate vendor/ from go.mod (clears -mod=vendor for this command)

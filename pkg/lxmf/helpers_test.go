@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"testing"
 
-	"git.quad4.io/Go-Libs/msgpack/v5/pkg/msgpack"
+	"quad4/msgpack/v5/pkg/msgpack"
 )
 
 func TestDisplayNameFromAppData_LegacyPlain(t *testing.T) {

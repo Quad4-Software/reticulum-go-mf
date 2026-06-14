@@ -6,8 +6,8 @@ import (
 	"errors"
 	"io"
 
-	"git.quad4.io/Go-Libs/msgpack/v5/pkg/msgpack"
-	"git.quad4.io/Go-Libs/msgpack/v5/pkg/msgpack/msgpcode"
+	"quad4/msgpack/v5/pkg/msgpack"
+	"quad4/msgpack/v5/pkg/msgpack/msgpcode"
 )
 
 // DisplayNameFromAppData returns the announce display name (legacy UTF-8 or v0.5.0+ msgpack).
