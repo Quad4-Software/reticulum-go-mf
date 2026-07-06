@@ -3,6 +3,7 @@ package lxmf
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -192,6 +193,78 @@ func (m *Messenger) SendStamped(msg *LXMessage, stampCost int) error {
 	msg.StampValue = value
 	msg.StampValid = true
 	return m.Send(msg)
+}
+
+// SendPropagated packs a propagated payload for propNodeHash. Link transport to the
+// propagation node is not implemented in reticulum-go v0.9.7; this prepares the
+// wire payload and returns ErrPropagationUnsupported.
+func (m *Messenger) SendPropagated(msg *LXMessage, propNodeHash []byte, pnStampCost int) error {
+	if msg == nil {
+		return errors.New("lxmf: nil message")
+	}
+	if len(propNodeHash) != DestinationLength {
+		return fmt.Errorf("propagation node: %w", ErrInvalidHashLength)
+	}
+	if len(msg.DestinationHash) != DestinationLength {
+		return fmt.Errorf("destination: %w", ErrInvalidHashLength)
+	}
+
+	remoteIdentity, err := identity.Recall(msg.DestinationHash)
+	if err != nil {
+		return fmt.Errorf("destination identity not found: %w", err)
+	}
+	if remoteIdentity == nil {
+		return ErrDestinationUnknown
+	}
+
+	recipient, err := destination.FromHash(msg.DestinationHash, remoteIdentity, destination.Single, m.transport)
+	if err != nil {
+		return fmt.Errorf("create recipient destination: %w", err)
+	}
+
+	signer := m.dest.GetIdentity()
+	if signer == nil {
+		return errors.New("lxmf: local destination has no identity")
+	}
+	if _, err := msg.Pack(signer); err != nil {
+		return err
+	}
+	if err := msg.PackPropagated(recipient, pnStampCost); err != nil {
+		return err
+	}
+
+	msg.State = StateOutbound
+	return fmt.Errorf("%w (prop node %s, payload %d bytes)", ErrPropagationUnsupported, hex.EncodeToString(propNodeHash), len(msg.PropagationPacked))
+}
+
+// SendStampedPropagated is SendPropagated after generating a delivery stamp.
+func (m *Messenger) SendStampedPropagated(msg *LXMessage, propNodeHash []byte, stampCost, pnStampCost int) error {
+	if msg == nil {
+		return errors.New("lxmf: nil message")
+	}
+	signer := m.dest.GetIdentity()
+	if signer == nil {
+		return errors.New("lxmf: local destination has no identity")
+	}
+	if _, err := msg.Pack(signer); err != nil {
+		return fmt.Errorf("pre-pack: %w", err)
+	}
+	if stampCost > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancel()
+		stamp, value, err := GenerateStamp(ctx, msg.Hash, stampCost, WorkblockExpandRounds)
+		cancel()
+		if err != nil {
+			return fmt.Errorf("stamp generation: %w", err)
+		}
+		msg.Stamp = stamp
+		msg.StampValue = value
+		msg.StampValid = true
+		if _, err := msg.Pack(signer); err != nil {
+			return fmt.Errorf("re-pack with stamp: %w", err)
+		}
+	}
+	return m.SendPropagated(msg, propNodeHash, pnStampCost)
 }
 
 // Receive implements inbound delivery for the lxmf.delivery destination, decrypts,

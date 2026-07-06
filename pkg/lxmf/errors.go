@@ -23,4 +23,8 @@ var (
 	ErrContentTooLarge = errors.New("content exceeds delivery method limit")
 	// ErrUnsupportedMethod means the delivery method is not implemented here.
 	ErrUnsupportedMethod = errors.New("unsupported delivery method")
+	// ErrNoPropagationNode means no propagation node was discovered or reachable in time.
+	ErrNoPropagationNode = errors.New("no propagation node available")
+	// ErrPropagationUnsupported means propagated delivery is not available in this build.
+	ErrPropagationUnsupported = errors.New("propagated delivery requires RNS link client (not in reticulum-go v0.9.7)")
 )

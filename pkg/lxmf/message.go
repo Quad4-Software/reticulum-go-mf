@@ -3,6 +3,7 @@ package lxmf
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"quad4/msgpack/v5/pkg/msgpack"
+	"quad4/reticulum-go/pkg/destination"
 	"quad4/reticulum-go/pkg/identity"
 )
 
@@ -51,6 +53,10 @@ type LXMessage struct {
 	StampValue int
 	// StampValid reflects the last ValidateStamp outcome.
 	StampValid bool
+
+	PropagationStamp  []byte
+	PropagationPacked []byte
+	TransientID       []byte
 }
 
 // NewMessage builds a message in StateGenerating with the given hashes, title, content, and optional fields.
@@ -326,6 +332,54 @@ func (m *LXMessage) EncryptedPayload() ([]byte, error) {
 		return nil, errors.New("lxmf: message has not been packed")
 	}
 	return m.Packed[DestinationLength:], nil
+}
+
+// PackPropagated builds propagation_packed for delivery via a propagation node.
+// recipient must be an outbound lxmf.delivery destination for the message recipient.
+func (m *LXMessage) PackPropagated(recipient *destination.Destination, pnStampCost int) error {
+	if recipient == nil {
+		return errors.New("lxmf: nil recipient destination")
+	}
+	if len(m.Packed) == 0 {
+		return errors.New("lxmf: message has not been packed")
+	}
+
+	encrypted, err := recipient.Encrypt(m.Packed[DestinationLength:])
+	if err != nil {
+		return fmt.Errorf("encrypt for propagation: %w", err)
+	}
+
+	lxmfData := make([]byte, 0, DestinationLength+len(encrypted))
+	lxmfData = append(lxmfData, m.Packed[:DestinationLength]...)
+	lxmfData = append(lxmfData, encrypted...)
+
+	transientSum := sha256.Sum256(lxmfData)
+	m.TransientID = transientSum[:]
+
+	if pnStampCost > 0 {
+		if len(m.PropagationStamp) == 0 {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			defer cancel()
+			stamp, _, err := GenerateStamp(ctx, m.TransientID, pnStampCost, WorkblockExpandRoundsPN)
+			if err != nil {
+				return fmt.Errorf("propagation stamp: %w", err)
+			}
+			m.PropagationStamp = stamp
+		}
+		lxmfData = append(lxmfData, m.PropagationStamp...)
+	}
+
+	outer, err := msgpack.Marshal([]any{float64(time.Now().UnixNano()) / 1e9, []any{lxmfData}})
+	if err != nil {
+		return fmt.Errorf("encode propagation payload: %w", err)
+	}
+	m.PropagationPacked = outer
+	m.Method = MethodPropagated
+	m.Representation = RepresentationPacket
+	if len(outer) > LinkPacketMaxContent {
+		m.Representation = RepresentationResource
+	}
+	return nil
 }
 
 // Unpack parses a full on-wire blob starting with destination hash.
