@@ -2,9 +2,11 @@
 package lxmf
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"quad4/reticulum-go/pkg/common"
 	"quad4/reticulum-go/pkg/destination"
@@ -34,6 +36,7 @@ func NewMessenger(t *transport.Transport, d *destination.Destination) *Messenger
 		resolver:  RecallSource,
 	}
 	d.SetPacketCallback(m.onPacket)
+	t.RegisterDestination(d.GetHash(), m)
 	return m
 }
 
@@ -162,6 +165,57 @@ func (m *Messenger) SendText(destinationHash []byte, title, content string) (*LX
 		return nil, err
 	}
 	return msg, nil
+}
+
+// SendStamped packs the message, generates a PoW stamp for stampCost, and sends opportunistically.
+func (m *Messenger) SendStamped(msg *LXMessage, stampCost int) error {
+	if msg == nil {
+		return errors.New("lxmf: nil message")
+	}
+	if stampCost <= 0 {
+		return m.Send(msg)
+	}
+	signer := m.dest.GetIdentity()
+	if signer == nil {
+		return errors.New("lxmf: local destination has no identity")
+	}
+	if _, err := msg.Pack(signer); err != nil {
+		return fmt.Errorf("pre-pack: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	stamp, value, err := GenerateStamp(ctx, msg.Hash, stampCost, WorkblockExpandRounds)
+	if err != nil {
+		return fmt.Errorf("stamp generation: %w", err)
+	}
+	msg.Stamp = stamp
+	msg.StampValue = value
+	msg.StampValid = true
+	return m.Send(msg)
+}
+
+// Receive implements inbound delivery for the lxmf.delivery destination, decrypts,
+// sends a delivery proof to the sender, and dispatches the LXMF payload.
+func (m *Messenger) Receive(pkt *packet.Packet, iface common.NetworkInterface) {
+	if pkt == nil {
+		return
+	}
+	if pkt.PacketType == packet.PacketTypeLinkReq {
+		m.dest.Receive(pkt, iface)
+		return
+	}
+
+	plaintext, err := m.dest.Decrypt(pkt.Data)
+	if err != nil {
+		Warning("inbound lxmf decrypt failed", "error", err, "packet_len", len(pkt.Data))
+		return
+	}
+
+	if err := sendDeliveryProof(m.dest, pkt, iface); err != nil {
+		Warning("inbound lxmf proof failed", "error", err)
+	}
+
+	m.onPacket(plaintext, iface)
 }
 
 func (m *Messenger) onPacket(plaintext []byte, iface common.NetworkInterface) {
