@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"quad4/reticulum-go/pkg/common"
+	"quad4/reticulum-go/pkg/cryptography"
 	"quad4/reticulum-go/pkg/identity"
 	"quad4/reticulum-go/pkg/interfaces"
+	"quad4/reticulum-go/pkg/packet"
 	"quad4/reticulum-go/pkg/transport"
 )
 
@@ -231,5 +233,78 @@ func TestMessenger_TwoWayLoopback(t *testing.T) {
 	}
 	if got2 != nil && !got2.SignatureValidated {
 		t.Errorf("inbound 2 signature not validated: reason=%d", got2.UnverifiedReason)
+	}
+}
+
+func TestMessenger_RatchetEncryptedInbound(t *testing.T) {
+	cfg := common.DefaultConfig()
+	tr := transport.NewTransport(cfg)
+	id, err := identity.NewIdentity()
+	if err != nil {
+		t.Fatalf("identity: %v", err)
+	}
+	dest, err := NewDeliveryDestination(id, tr)
+	if err != nil {
+		t.Fatalf("destination: %v", err)
+	}
+	m := NewMessenger(tr, dest)
+
+	if err := dest.Announce(false, nil, nil); err != nil {
+		t.Fatalf("announce: %v", err)
+	}
+
+	ratchetPriv := id.GetCurrentRatchetKey()
+	if ratchetPriv == nil {
+		t.Fatal("expected identity ratchet after announce")
+	}
+	ratchetPub, err := cryptography.PublicKeyFromPrivate(ratchetPriv)
+	if err != nil {
+		t.Fatalf("ratchet public key: %v", err)
+	}
+
+	remote := make([]byte, DestinationLength)
+	msg, err := m.Compose(remote, "ratchet", "encrypted inbound", nil)
+	if err != nil {
+		t.Fatalf("Compose: %v", err)
+	}
+	if _, err := msg.Pack(id); err != nil {
+		t.Fatalf("Pack: %v", err)
+	}
+	inner, err := msg.EncryptedPayload()
+	if err != nil {
+		t.Fatalf("EncryptedPayload: %v", err)
+	}
+
+	senderView := identity.FromPublicKey(id.GetPublicKey())
+	ciphertext, err := senderView.Encrypt(inner, ratchetPub)
+	if err != nil {
+		t.Fatalf("Encrypt with ratchet: %v", err)
+	}
+
+	done := make(chan *LXMessage, 1)
+	m.SetMessageHandler(func(msg *LXMessage, _ common.NetworkInterface) {
+		done <- msg
+	})
+
+	pkt := packet.NewPacket(
+		packet.DestinationSingle,
+		ciphertext,
+		packet.PacketTypeData,
+		packet.ContextNone,
+		packet.PropagationBroadcast,
+		packet.HeaderType1,
+		nil,
+		true,
+		packet.FlagUnset,
+	)
+	m.Receive(pkt, nil)
+
+	select {
+	case got := <-done:
+		if got.ContentString() != "encrypted inbound" {
+			t.Errorf("content = %q", got.ContentString())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for ratchet-encrypted inbound message")
 	}
 }

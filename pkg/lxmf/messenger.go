@@ -205,7 +205,7 @@ func (m *Messenger) Receive(pkt *packet.Packet, iface common.NetworkInterface) {
 		return
 	}
 
-	plaintext, err := m.dest.Decrypt(pkt.Data)
+	plaintext, err := m.decryptInbound(pkt.Data)
 	if err != nil {
 		Warning("inbound lxmf decrypt failed", "error", err, "packet_len", len(pkt.Data))
 		return
@@ -216,6 +216,26 @@ func (m *Messenger) Receive(pkt *packet.Packet, iface common.NetworkInterface) {
 	}
 
 	m.onPacket(plaintext, iface)
+}
+
+// EnableRatchets enables destination ratchet keys for inbound decryption and persistence.
+func (m *Messenger) EnableRatchets(path string) bool {
+	return m.dest.EnableRatchets(path)
+}
+
+func (m *Messenger) decryptInbound(ciphertext []byte) ([]byte, error) {
+	id := m.dest.GetIdentity()
+	if id == nil {
+		return nil, errors.New("no identity available for decryption")
+	}
+
+	ratchets := m.dest.GetRatchets()
+	if idRatchets := id.GetRatchets(); len(idRatchets) > 0 {
+		ratchets = append(ratchets, idRatchets...)
+	}
+
+	receiver := &common.RatchetIDReceiver{}
+	return id.Decrypt(ciphertext, ratchets, false, receiver)
 }
 
 func (m *Messenger) onPacket(plaintext []byte, iface common.NetworkInterface) {
