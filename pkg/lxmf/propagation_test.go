@@ -2,7 +2,6 @@
 package lxmf
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -106,7 +105,7 @@ func TestPackPropagated_RoundTripFields(t *testing.T) {
 	}
 }
 
-func TestSendPropagated_Unsupported(t *testing.T) {
+func TestSendPropagated_NoPath(t *testing.T) {
 	tr := transport.NewTransport(common.DefaultConfig())
 	id, _ := identity.NewIdentity()
 	m, err := NewDeliveryMessenger(id, tr)
@@ -127,10 +126,7 @@ func TestSendPropagated_Unsupported(t *testing.T) {
 		t.Fatalf("Compose: %v", err)
 	}
 	err = m.SendPropagated(msg, propNode, 16)
-	if !errors.Is(err, ErrPropagationUnsupported) {
-		t.Fatalf("expected ErrPropagationUnsupported, got %v", err)
-	}
-	if len(msg.PropagationPacked) == 0 {
-		t.Fatal("expected propagation payload to be prepared")
+	if err == nil {
+		t.Fatal("expected error without path to propagation node")
 	}
 }

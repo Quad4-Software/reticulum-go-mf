@@ -33,13 +33,14 @@ const (
 )
 
 type chatSession struct {
-	mu        sync.Mutex
-	messenger *lxmf.Messenger
-	transport *transport.Transport
+	mu          sync.Mutex
+	messenger   *lxmf.Messenger
+	transport   *transport.Transport
 	defaultDest []byte
 	replyDest   []byte
 	stampCost   int
 	title       string
+	propNode    *lxmf.PropagationNode
 }
 
 func main() {
@@ -54,6 +55,8 @@ func main() {
 	noInitialSend := flag.Bool("no-initial-send", false, "skip the startup message")
 	logLevel := flag.Int("loglevel", 0, "reticulum log level 0-7 (0=silent, 1=critical, 3=info)")
 	lxmfLog := flag.Int("lxmf-log", 5, "lxmf log level 1-7 (5+= inbound decode trace)")
+	propMode := flag.String("prop", "", "propagation: list reachable nodes, auto pick one, or node hash hex")
+	propWait := flag.Duration("prop-wait", 90*time.Second, "wait for propagation node announces/paths")
 	flag.Parse()
 	setupLogging(*logLevel, *lxmfLog)
 
@@ -104,6 +107,9 @@ func main() {
 		fatal("interfaces: %v", err)
 	}
 
+	propRegistry := lxmf.NewPropagationRegistry()
+	tr.RegisterAnnounceHandler(propRegistry)
+
 	id, err := loadIdentity(*identityPath)
 	if err != nil {
 		fatal("identity: %v", err)
@@ -120,6 +126,33 @@ func main() {
 	}
 	messenger.Destination().SetDefaultAppData(appData)
 
+	messenger.SetMessageHandler(nil)
+
+	localHash := messenger.DestinationHash()
+	fmt.Printf("local lxmf.delivery: %s\n", hex.EncodeToString(localHash))
+	fmt.Printf("default peer:        %s\n", hex.EncodeToString(dest))
+	fmt.Printf("waiting %s for interfaces to settle...\n", initialWait)
+	time.Sleep(initialWait)
+
+	propFlag := strings.TrimSpace(strings.ToLower(*propMode))
+	if propFlag == "list" {
+		printPropagationNodes(tr, propRegistry, *propWait, false)
+		return
+	}
+
+	var propNode *lxmf.PropagationNode
+	if propFlag != "" {
+		propNode, err = resolvePropagationNode(tr, propRegistry, propFlag, *propWait)
+		if err != nil {
+			fatal("propagation: %v", err)
+		}
+		fmt.Printf("propagation node:    %s", hex.EncodeToString(propNode.Hash))
+		if propNode.Name != "" {
+			fmt.Printf(" (%s)", propNode.Name)
+		}
+		fmt.Printf(" stamp=%d hops=%d\n", propNode.StampCost, propNode.Hops)
+	}
+
 	sess := &chatSession{
 		messenger:   messenger,
 		transport:   tr,
@@ -127,15 +160,9 @@ func main() {
 		replyDest:   append([]byte(nil), dest...),
 		stampCost:   *stampCost,
 		title:       *title,
+		propNode:    propNode,
 	}
-
 	messenger.SetMessageHandler(sess.onInbound)
-
-	localHash := messenger.DestinationHash()
-	fmt.Printf("local lxmf.delivery: %s\n", hex.EncodeToString(localHash))
-	fmt.Printf("default peer:        %s\n", hex.EncodeToString(dest))
-	fmt.Printf("waiting %s for interfaces to settle...\n", initialWait)
-	time.Sleep(initialWait)
 
 	if err := announce(messenger); err != nil {
 		fatal("announce: %v", err)
@@ -215,6 +242,33 @@ func (s *chatSession) waitForPeer(dest []byte, timeout time.Duration) error {
 }
 
 func (s *chatSession) sendTo(dest []byte, title, content string) error {
+	s.mu.Lock()
+	propNode := s.propNode
+	stampCost := s.stampCost
+	s.mu.Unlock()
+
+	if propNode != nil {
+		if s.stampCost > 0 {
+			fmt.Printf("generating stamp (cost=%d)...\n", stampCost)
+		}
+		fmt.Printf("packing propagated message (pn stamp=%d)...\n", propNode.StampCost)
+
+		msg, err := s.messenger.Compose(dest, title, content, nil)
+		if err != nil {
+			return err
+		}
+		if stampCost > 0 {
+			err = s.messenger.SendStampedPropagated(msg, propNode.Hash, stampCost, int(propNode.StampCost))
+		} else {
+			err = s.messenger.SendPropagated(msg, propNode.Hash, int(propNode.StampCost))
+		}
+		if err != nil {
+			return err
+		}
+		fmt.Printf("sent via propagation node %s hash=%s\n", hex.EncodeToString(propNode.Hash), hex.EncodeToString(msg.Hash))
+		return nil
+	}
+
 	if s.stampCost > 0 {
 		fmt.Printf("generating stamp (cost=%d)...\n", s.stampCost)
 	}
@@ -369,6 +423,99 @@ func startInterfaces(cfg *common.ReticulumConfig, tr *transport.Transport) error
 		return fmt.Errorf("no interfaces started from %s", cfg.ConfigPath)
 	}
 	return nil
+}
+
+func resolvePropagationNode(tr *transport.Transport, reg *lxmf.PropagationRegistry, mode string, wait time.Duration) (*lxmf.PropagationNode, error) {
+	mode = strings.TrimSpace(strings.ToLower(mode))
+	if mode == "auto" {
+		fmt.Printf("waiting up to %s for a reachable propagation node...\n", wait)
+		nodes, err := reg.WaitFor(tr, 1, wait)
+		if err != nil {
+			return nil, err
+		}
+		node, ok := reg.PickRandom(func(n *lxmf.PropagationNode) bool {
+			for _, reachable := range nodes {
+				if hex.EncodeToString(reachable.Hash) == hex.EncodeToString(n.Hash) {
+					return true
+				}
+			}
+			return false
+		})
+		if !ok {
+			return nil, lxmf.ErrNoPropagationNode
+		}
+		return node, nil
+	}
+
+	hash, err := hex.DecodeString(strings.TrimSpace(mode))
+	if err != nil || len(hash) != lxmf.DestinationLength {
+		return nil, fmt.Errorf("invalid -prop hash: need %d bytes hex or 'auto' or 'list'", lxmf.DestinationLength)
+	}
+
+	fmt.Printf("waiting up to %s for propagation node %s...\n", wait, hex.EncodeToString(hash))
+	deadline := time.Now().Add(wait)
+	for {
+		for _, n := range reg.List() {
+			if hex.EncodeToString(n.Hash) == hex.EncodeToString(hash) {
+				if tr.HasPath(n.Hash) {
+					copy := *n
+					copy.Hash = append([]byte(nil), n.Hash...)
+					return &copy, nil
+				}
+			}
+		}
+		if err := tr.RequestPath(hash, "", nil, true); err != nil {
+			fmt.Printf("path request: %v\n", err)
+		}
+		if tr.HasPath(hash) {
+			return &lxmf.PropagationNode{
+				Hash:      append([]byte(nil), hash...),
+				StampCost: lxmf.PropagationStampCostMin,
+				LastSeen:  time.Now(),
+			}, nil
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("%w: %s", lxmf.ErrNoPropagationNode, hex.EncodeToString(hash))
+		}
+		time.Sleep(pathPoll)
+	}
+}
+
+func printPropagationNodes(tr *transport.Transport, reg *lxmf.PropagationRegistry, wait time.Duration, requireReachable bool) {
+	fmt.Printf("listening up to %s for propagation node announces...\n", wait)
+	deadline := time.Now().Add(wait)
+	for {
+		nodes := reg.List()
+		reachable := 0
+		for _, n := range nodes {
+			if tr.HasPath(n.Hash) {
+				reachable++
+			}
+		}
+		fmt.Printf("\rpropagation nodes: heard=%d reachable=%d   ", len(nodes), reachable)
+		if len(nodes) > 0 && (!requireReachable || reachable > 0) {
+			break
+		}
+		if time.Now().After(deadline) {
+			fmt.Println()
+			if len(nodes) == 0 {
+				fmt.Println("no propagation nodes heard")
+				return
+			}
+			break
+		}
+		time.Sleep(pathPoll)
+	}
+	fmt.Println()
+	for _, n := range reg.List() {
+		path := tr.HasPath(n.Hash)
+		name := n.Name
+		if name == "" {
+			name = "-"
+		}
+		fmt.Printf("  %s  name=%q  stamp=%d  hops=%d  path=%v\n",
+			hex.EncodeToString(n.Hash), name, n.StampCost, n.Hops, path)
+	}
 }
 
 func fatal(format string, args ...any) {

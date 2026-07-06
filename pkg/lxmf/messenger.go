@@ -3,7 +3,6 @@ package lxmf
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"quad4/reticulum-go/pkg/common"
 	"quad4/reticulum-go/pkg/destination"
 	"quad4/reticulum-go/pkg/identity"
+	"quad4/reticulum-go/pkg/link"
 	"quad4/reticulum-go/pkg/packet"
 	"quad4/reticulum-go/pkg/transport"
 )
@@ -27,6 +27,10 @@ type Messenger struct {
 	mu       sync.RWMutex
 	handler  MessageHandler
 	resolver SourceResolver
+
+	propLinkMu sync.Mutex
+	propLink   *link.Link
+	propLinkNode []byte
 }
 
 // NewMessenger registers d's packet callback for inbound LXMF. Use NewDeliveryDestination for lxmf.delivery naming.
@@ -195,9 +199,7 @@ func (m *Messenger) SendStamped(msg *LXMessage, stampCost int) error {
 	return m.Send(msg)
 }
 
-// SendPropagated packs a propagated payload for propNodeHash. Link transport to the
-// propagation node is not implemented in reticulum-go v0.9.7; this prepares the
-// wire payload and returns ErrPropagationUnsupported.
+// SendPropagated uploads a packed message to propNodeHash via an RNS link.
 func (m *Messenger) SendPropagated(msg *LXMessage, propNodeHash []byte, pnStampCost int) error {
 	if msg == nil {
 		return errors.New("lxmf: nil message")
@@ -233,8 +235,21 @@ func (m *Messenger) SendPropagated(msg *LXMessage, propNodeHash []byte, pnStampC
 		return err
 	}
 
-	msg.State = StateOutbound
-	return fmt.Errorf("%w (prop node %s, payload %d bytes)", ErrPropagationUnsupported, hex.EncodeToString(propNodeHash), len(msg.PropagationPacked))
+	lnk, err := m.ensurePropagationLink(propNodeHash)
+	if err != nil {
+		return err
+	}
+	if err := m.sendPropagationPayload(lnk, msg.PropagationPacked); err != nil {
+		return err
+	}
+
+	msg.Method = MethodPropagated
+	msg.Representation = RepresentationPacket
+	if len(msg.PropagationPacked) > LinkPacketMaxContent {
+		msg.Representation = RepresentationResource
+	}
+	msg.State = StateSent
+	return nil
 }
 
 // SendStampedPropagated is SendPropagated after generating a delivery stamp.
