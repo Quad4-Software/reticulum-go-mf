@@ -1,0 +1,401 @@
+//go:build ignore
+
+package main
+
+import (
+	"bufio"
+	"encoding/hex"
+	"flag"
+	"fmt"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
+	"quad4/reticulum-go-mf/pkg/lxmf"
+	"quad4/reticulum-go/pkg/common"
+	rnsdebug "quad4/reticulum-go/pkg/debug"
+	"quad4/reticulum-go/pkg/identity"
+	"quad4/reticulum-go/pkg/interfaces"
+	"quad4/reticulum-go/pkg/reticulumconfig"
+	"quad4/reticulum-go/pkg/transport"
+)
+
+const (
+	initialWait     = 2 * time.Second
+	pathWait        = 90 * time.Second
+	pathPoll        = 500 * time.Millisecond
+	defaultStamp    = 8
+	defaultDestHash = "f489752fbef161c64d65e385a4e9fc74"
+)
+
+type chatSession struct {
+	mu        sync.Mutex
+	messenger *lxmf.Messenger
+	transport *transport.Transport
+	defaultDest []byte
+	replyDest   []byte
+	stampCost   int
+	title       string
+}
+
+func main() {
+	destHex := flag.String("dest", defaultDestHash, "default remote lxmf.delivery destination hash (hex)")
+	title := flag.String("title", "go-lxmf", "initial message title")
+	content := flag.String("content", "Hello from reticulum-go-mf", "initial message body")
+	displayName := flag.String("name", "Go LXMF", "display name in lxmf announce")
+	configPath := flag.String("config", "", "Reticulum-Go config file (default ~/.reticulum-go/config)")
+	stampCost := flag.Int("stamp", defaultStamp, "PoW stamp cost for outbound messages (0 to skip)")
+	identityPath := flag.String("identity", "", "64-byte identity file (default ~/.reticulum-go/storage/identity)")
+	announceEvery := flag.Duration("announce-every", 15*time.Minute, "re-announce interval (0 = once at startup)")
+	noInitialSend := flag.Bool("no-initial-send", false, "skip the startup message")
+	logLevel := flag.Int("loglevel", 0, "reticulum log level 0-7 (0=silent, 1=critical, 3=info)")
+	lxmfLog := flag.Int("lxmf-log", 5, "lxmf log level 1-7 (5+= inbound decode trace)")
+	flag.Parse()
+	setupLogging(*logLevel, *lxmfLog)
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		fatal("home dir: %v", err)
+	}
+	if *configPath == "" {
+		p, err := reticulumconfig.GetConfigPath()
+		if err != nil {
+			fatal("config path: %v", err)
+		}
+		*configPath = p
+	}
+	if *identityPath == "" {
+		*identityPath = filepath.Join(home, ".reticulum-go", "storage", "identity")
+	}
+
+	storage := filepath.Join(home, ".reticulum-go", "storage")
+	if err := os.Setenv("RETICULUM_STORAGE_PATH", storage); err != nil {
+		fatal("set storage env: %v", err)
+	}
+
+	dest, err := hex.DecodeString(strings.TrimSpace(*destHex))
+	if err != nil || len(dest) != lxmf.DestinationLength {
+		fatal("invalid -dest hash: need %d bytes hex", lxmf.DestinationLength)
+	}
+
+	cfg, err := reticulumconfig.LoadConfig(*configPath)
+	if err != nil {
+		fatal("load config %s: %v", *configPath, err)
+	}
+
+	tr := transport.NewTransport(cfg)
+	tid, err := identity.LoadOrCreateTransportIdentity("")
+	if err != nil {
+		fatal("transport identity: %v", err)
+	}
+	tr.SetIdentity(tid)
+	if err := tr.Start(); err != nil {
+		fatal("transport start: %v", err)
+	}
+	defer tr.Close()
+	if err := tr.InitializePathRequestHandler(); err != nil {
+		fatal("path request handler: %v", err)
+	}
+	if err := startInterfaces(cfg, tr); err != nil {
+		fatal("interfaces: %v", err)
+	}
+
+	id, err := loadIdentity(*identityPath)
+	if err != nil {
+		fatal("identity: %v", err)
+	}
+
+	messenger, err := lxmf.NewDeliveryMessenger(id, tr)
+	if err != nil {
+		fatal("messenger: %v", err)
+	}
+
+	appData, err := lxmf.EncodeAnnounceAppDataV5(*displayName, int64(*stampCost))
+	if err != nil {
+		fatal("announce app data: %v", err)
+	}
+	messenger.Destination().SetDefaultAppData(appData)
+
+	sess := &chatSession{
+		messenger:   messenger,
+		transport:   tr,
+		defaultDest: dest,
+		replyDest:   append([]byte(nil), dest...),
+		stampCost:   *stampCost,
+		title:       *title,
+	}
+
+	messenger.SetMessageHandler(sess.onInbound)
+
+	localHash := messenger.DestinationHash()
+	fmt.Printf("local lxmf.delivery: %s\n", hex.EncodeToString(localHash))
+	fmt.Printf("default peer:        %s\n", hex.EncodeToString(dest))
+	fmt.Printf("waiting %s for interfaces to settle...\n", initialWait)
+	time.Sleep(initialWait)
+
+	if err := announce(messenger); err != nil {
+		fatal("announce: %v", err)
+	}
+	fmt.Printf("announced as %q (stamp=%d)\n", *displayName, *stampCost)
+
+	if *announceEvery > 0 {
+		go announceLoop(messenger, *announceEvery)
+	}
+
+	if !*noInitialSend {
+		if err := sess.waitForPeer(dest, pathWait); err != nil {
+			fatal("%v", err)
+		}
+		if err := sess.sendTo(dest, *title, *content); err != nil {
+			fatal("initial send: %v", err)
+		}
+	}
+
+	runChat(sess)
+}
+
+func (s *chatSession) onInbound(msg *lxmf.LXMessage, _ common.NetworkInterface) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.replyDest = append([]byte(nil), msg.SourceHash...)
+
+	lxmf.Info("inbound lxmf",
+		"from", hex.EncodeToString(msg.SourceHash),
+		"title", msg.TitleString(),
+		"signature_valid", msg.SignatureValidated,
+		"stamp_bytes", len(msg.Stamp),
+	)
+
+	fmt.Printf("\n--- inbound from %s ---\n", hex.EncodeToString(msg.SourceHash))
+	fmt.Printf("title: %s\n", msg.TitleString())
+	fmt.Printf("%s\n", msg.ContentString())
+	if !msg.SignatureValidated {
+		fmt.Printf("(signature not verified: reason %d)\n", msg.UnverifiedReason)
+	}
+	if len(msg.Stamp) > 0 {
+		valid, err := msg.ValidateStamp(s.stampCost, nil)
+		if err != nil {
+			fmt.Printf("(stamp check: %v)\n", err)
+		} else if !valid {
+			fmt.Printf("(stamp invalid for cost %d, value %d)\n", s.stampCost, msg.StampValue)
+		} else {
+			fmt.Printf("(stamp ok, value %d)\n", msg.StampValue)
+		}
+	}
+	fmt.Print("> ")
+}
+
+func (s *chatSession) waitForPeer(dest []byte, timeout time.Duration) error {
+	if err := s.transport.RequestPath(dest, "", nil, true); err != nil {
+		fmt.Printf("path request: %v\n", err)
+	}
+
+	deadline := time.Now().Add(timeout)
+	destHex := hex.EncodeToString(dest)
+	for {
+		idKnown := false
+		if peer, _ := identity.Recall(dest); peer != nil {
+			idKnown = true
+		}
+		hasPath := s.transport.HasPath(dest)
+		if idKnown && hasPath {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout: recall=%v path=%v (announce/path to %s required)", idKnown, hasPath, destHex)
+		}
+		fmt.Printf("\rwaiting for peer: identity=%v path=%v   ", idKnown, hasPath)
+		time.Sleep(pathPoll)
+	}
+}
+
+func (s *chatSession) sendTo(dest []byte, title, content string) error {
+	if s.stampCost > 0 {
+		fmt.Printf("generating stamp (cost=%d)...\n", s.stampCost)
+	}
+
+	msg, err := s.messenger.Compose(dest, title, content, nil)
+	if err != nil {
+		return err
+	}
+
+	if s.stampCost > 0 {
+		if err := s.messenger.SendStamped(msg, s.stampCost); err != nil {
+			return err
+		}
+	} else if _, err := s.messenger.SendText(dest, title, content); err != nil {
+		return err
+	}
+
+	fmt.Printf("sent to %s hash=%s stamp_cost=%d\n", hex.EncodeToString(dest), hex.EncodeToString(msg.Hash), s.stampCost)
+	return nil
+}
+
+func (s *chatSession) sendReply(content string) error {
+	s.mu.Lock()
+	dest := append([]byte(nil), s.replyDest...)
+	s.mu.Unlock()
+
+	if len(dest) != lxmf.DestinationLength {
+		return fmt.Errorf("no reply destination")
+	}
+
+	if err := s.waitForPeer(dest, 30*time.Second); err != nil {
+		return err
+	}
+	return s.sendTo(dest, s.title, content)
+}
+
+func runChat(sess *chatSession) {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+
+	fmt.Println("listening for lxmf messages (Ctrl+C or /quit to exit)")
+	fmt.Print("> ")
+
+	input := make(chan string)
+	go func() {
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			input <- scanner.Text()
+		}
+		close(input)
+	}()
+
+	for {
+		select {
+		case <-sig:
+			fmt.Println("\nexiting")
+			return
+		case line, ok := <-input:
+			if !ok {
+				fmt.Println("\nexiting")
+				return
+			}
+			line = strings.TrimSpace(line)
+			if line == "" {
+				fmt.Print("> ")
+				continue
+			}
+			if line == "/quit" || line == "/exit" {
+				fmt.Println("exiting")
+				return
+			}
+			if err := sess.sendReply(line); err != nil {
+				fmt.Fprintf(os.Stderr, "send failed: %v\n", err)
+			}
+			fmt.Print("> ")
+		}
+	}
+}
+
+func announce(messenger *lxmf.Messenger) error {
+	return messenger.Destination().Announce(false, nil, nil)
+}
+
+func announceLoop(messenger *lxmf.Messenger, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for range ticker.C {
+		if err := announce(messenger); err != nil {
+			fmt.Fprintf(os.Stderr, "re-announce failed: %v\n", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "re-announced lxmf.delivery\n")
+		}
+	}
+}
+
+func loadIdentity(path string) (*identity.Identity, error) {
+	if st, err := os.Stat(path); err == nil && !st.IsDir() {
+		return identity.FromFile(path)
+	}
+	id, err := identity.NewIdentity()
+	if err != nil {
+		return nil, err
+	}
+	if err := id.ToFile(path); err != nil {
+		return nil, fmt.Errorf("save new identity to %s: %w", path, err)
+	}
+	fmt.Printf("created identity at %s\n", path)
+	return id, nil
+}
+
+func startInterfaces(cfg *common.ReticulumConfig, tr *transport.Transport) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	ctx := &interfaces.FromConfigContext{
+		I2PStoragePath: filepath.Join(home, ".reticulum-go", "storage"),
+		TransportID:    tr.TransportIdentityHash(),
+		RegisterPeer: func(name string, peer common.NetworkInterface) error {
+			return tr.RegisterInterface(name, peer)
+		},
+	}
+
+	started := 0
+	for name, ifaceCfg := range cfg.Interfaces {
+		if ifaceCfg == nil || !ifaceCfg.Enabled {
+			continue
+		}
+		iface, err := interfaces.NewFromConfigWithContext(name, ifaceCfg, ctx)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "skip interface %q: %v\n", name, err)
+			continue
+		}
+		iface.SetPacketCallback(func(data []byte, ni common.NetworkInterface) {
+			tr.HandlePacket(data, ni)
+		})
+		if err := iface.Start(); err != nil {
+			fmt.Fprintf(os.Stderr, "start interface %q: %v\n", name, err)
+			continue
+		}
+		ni, ok := iface.(common.NetworkInterface)
+		if !ok {
+			continue
+		}
+		if err := tr.RegisterInterface(name, ni); err != nil {
+			return err
+		}
+		fmt.Printf("interface up: %s (%s)\n", name, ifaceCfg.Type)
+		started++
+	}
+	if started == 0 {
+		return fmt.Errorf("no interfaces started from %s", cfg.ConfigPath)
+	}
+	return nil
+}
+
+func fatal(format string, args ...any) {
+	fmt.Fprintf(os.Stderr, "lxmf-send: "+format+"\n", args...)
+	os.Exit(1)
+}
+
+func setupLogging(rnsLevel, lxmfLevel int) {
+	rnsdebug.Init()
+	if rnsLevel < 0 {
+		rnsLevel = 0
+	}
+	if rnsLevel > 7 {
+		rnsLevel = 7
+	}
+	if lxmfLevel < 1 {
+		lxmfLevel = 1
+	}
+	if lxmfLevel > 7 {
+		lxmfLevel = 7
+	}
+	rnsdebug.SetDebugLevel(rnsLevel)
+	lxmf.MirrorRNSDebug(false)
+	lxmf.SetLogLevel(lxmfLevel)
+	if rnsLevel == 0 {
+		fmt.Fprintln(os.Stderr, "logging: reticulum=silent lxmf=", lxmfLevel)
+	} else {
+		fmt.Fprintf(os.Stderr, "logging: reticulum=%d lxmf=%d\n", rnsLevel, lxmfLevel)
+	}
+}
