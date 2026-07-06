@@ -28,3 +28,9 @@ Thumbs.db
 
 # Format diff files
 fmt.diff
+
+# Upstream LXMF reference clone for interop tests
+LXMF-ref/
+
+# Python interop test virtualenv
+pkg/lxmf/interoptest/.venv/

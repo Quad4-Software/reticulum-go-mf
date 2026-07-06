@@ -93,7 +93,7 @@ tasks:
       - '{{.GOCMD}} test -v -count=1 ./pkg/lxmf/...'
 
   test:lxmf:interop:
-    desc: Run LXMF Go-Python interop tests via uv
+    desc: Run LXMF Go-Python interop tests via uv (requires LXMF-ref clone and uv)
     cmds:
       - '{{.GOCMD}} test -v -count=1 -run TestInterop ./pkg/lxmf/...'
 
@@ -104,9 +104,11 @@ tasks:
       - '{{.GOCMD}} tool cover -html=coverage.out'
 
   deps:
-    desc: Tidy go.mod and refresh vendor/ from local replaces (offline)
+    desc: Tidy go.mod and refresh vendor/ from GitHub
     env:
       GOFLAGS: ''
+      GOPROXY: direct
+      GOSUMDB: 'off'
     cmds:
       - env GOWORK=off {{.GOCMD}} mod tidy
       - env GOWORK=off {{.GOCMD}} mod vendor
@@ -115,6 +117,8 @@ tasks:
     desc: Regenerate vendor/ from go.mod (clears -mod=vendor for this command)
     env:
       GOFLAGS: ''
+      GOPROXY: direct
+      GOSUMDB: 'off'
     cmds:
       - '{{.GOCMD}} mod vendor'
 

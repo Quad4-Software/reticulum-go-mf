@@ -4,8 +4,8 @@ package lxmf
 // AppName is the LXMF destination application identifier.
 const AppName = "lxmf"
 
-// Version is the LXMF protocol version implemented by this package.
-const Version = "0.9.4"
+// Version is the LXMF package version aligned with upstream LXMF.
+const Version = "1.0.1"
 
 // Wire layout sizes for packed LXMF messages.
 const (
@@ -75,6 +75,12 @@ const (
 	FieldRNRRefs         byte = 0x0E
 	FieldRenderer        byte = 0x0F
 
+	FieldReplyTo    byte = 0x30
+	FieldReplyQuote byte = 0x31
+	FieldReaction   byte = 0x40
+	FieldComment    byte = 0x41
+	FieldContinuation byte = 0x42
+
 	FieldCustomType byte = 0xFB
 	FieldCustomData byte = 0xFC
 	FieldCustomMeta byte = 0xFD
@@ -89,6 +95,22 @@ const (
 	RendererMicron   byte = 0x01
 	RendererMarkdown byte = 0x02
 	RendererBBCode   byte = 0x03
+)
+
+// Reaction dict keys for FieldReaction.
+const (
+	ReactionTo      byte = 0x00
+	ReactionContent byte = 0x01
+)
+
+// Comment dict keys for FieldComment.
+const (
+	CommentFor byte = 0x00
+)
+
+// Continuation dict keys for FieldContinuation.
+const (
+	ContinuationOf byte = 0x00
 )
 
 // Audio codec modes for FieldAudio.
