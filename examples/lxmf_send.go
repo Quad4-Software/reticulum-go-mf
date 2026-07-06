@@ -33,14 +33,16 @@ const (
 )
 
 type chatSession struct {
-	mu          sync.Mutex
-	messenger   *lxmf.Messenger
-	transport   *transport.Transport
-	defaultDest []byte
-	replyDest   []byte
-	stampCost   int
-	title       string
-	propNode    *lxmf.PropagationNode
+	mu           sync.Mutex
+	messenger    *lxmf.Messenger
+	transport    *transport.Transport
+	defaultDest  []byte
+	replyDest    []byte
+	stampCost    int
+	title        string
+	propNode     *lxmf.PropagationNode
+	propRegistry *lxmf.PropagationRegistry
+	propRetries  int
 }
 
 func main() {
@@ -57,6 +59,7 @@ func main() {
 	lxmfLog := flag.Int("lxmf-log", 5, "lxmf log level 1-7 (5+= inbound decode trace)")
 	propMode := flag.String("prop", "", "propagation: list reachable nodes, auto pick one, or node hash hex")
 	propWait := flag.Duration("prop-wait", 90*time.Second, "wait for propagation node announces/paths")
+	propRetries := flag.Int("prop-retries", 5, "propagation nodes to try when link or transfer fails")
 	flag.Parse()
 	setupLogging(*logLevel, *lxmfLog)
 
@@ -151,16 +154,20 @@ func main() {
 			fmt.Printf(" (%s)", propNode.Name)
 		}
 		fmt.Printf(" stamp=%d hops=%d\n", propNode.StampCost, propNode.Hops)
+		reachable := propRegistry.AttemptOrder(tr, propNode.Hash, nil, 0)
+		fmt.Printf("propagation retries: %d reachable node(s), up to %d attempt(s)\n", len(reachable), *propRetries)
 	}
 
 	sess := &chatSession{
-		messenger:   messenger,
-		transport:   tr,
-		defaultDest: dest,
-		replyDest:   append([]byte(nil), dest...),
-		stampCost:   *stampCost,
-		title:       *title,
-		propNode:    propNode,
+		messenger:    messenger,
+		transport:    tr,
+		defaultDest:  dest,
+		replyDest:    append([]byte(nil), dest...),
+		stampCost:    *stampCost,
+		title:        *title,
+		propNode:     propNode,
+		propRegistry: propRegistry,
+		propRetries:  *propRetries,
 	}
 	messenger.SetMessageHandler(sess.onInbound)
 
@@ -174,7 +181,11 @@ func main() {
 	}
 
 	if !*noInitialSend {
-		if err := sess.waitForPeer(dest, pathWait); err != nil {
+		if propNode != nil {
+			if err := sess.waitForDestinationIdentity(dest, pathWait); err != nil {
+				fatal("%v", err)
+			}
+		} else if err := sess.waitForPeer(dest, pathWait); err != nil {
 			fatal("%v", err)
 		}
 		if err := sess.sendTo(dest, *title, *content); err != nil {
@@ -241,9 +252,28 @@ func (s *chatSession) waitForPeer(dest []byte, timeout time.Duration) error {
 	}
 }
 
+func (s *chatSession) waitForDestinationIdentity(dest []byte, timeout time.Duration) error {
+	destHex := hex.EncodeToString(dest)
+	deadline := time.Now().Add(timeout)
+	for {
+		_, err := identity.Recall(dest)
+		idKnown := err == nil
+		if idKnown {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout: destination identity unknown for %s (announce required)", destHex)
+		}
+		fmt.Printf("\rwaiting for destination identity...   ")
+		time.Sleep(pathPoll)
+	}
+}
+
 func (s *chatSession) sendTo(dest []byte, title, content string) error {
 	s.mu.Lock()
 	propNode := s.propNode
+	propRegistry := s.propRegistry
+	propRetries := s.propRetries
 	stampCost := s.stampCost
 	s.mu.Unlock()
 
@@ -251,21 +281,30 @@ func (s *chatSession) sendTo(dest []byte, title, content string) error {
 		if s.stampCost > 0 {
 			fmt.Printf("generating stamp (cost=%d)...\n", stampCost)
 		}
-		fmt.Printf("packing propagated message (pn stamp=%d)...\n", propNode.StampCost)
+		fmt.Printf("propagation send (preferred=%s, up to %d nodes)...\n",
+			hex.EncodeToString(propNode.Hash), propRetries)
 
 		msg, err := s.messenger.Compose(dest, title, content, nil)
 		if err != nil {
 			return err
 		}
+		var used *lxmf.PropagationNode
 		if stampCost > 0 {
-			err = s.messenger.SendStampedPropagated(msg, propNode.Hash, stampCost, int(propNode.StampCost))
+			used, err = s.messenger.SendStampedPropagatedWithRetry(msg, propRegistry, propNode.Hash, stampCost, propRetries)
 		} else {
-			err = s.messenger.SendPropagated(msg, propNode.Hash, int(propNode.StampCost))
+			used, err = s.messenger.SendPropagatedWithRetry(msg, propRegistry, propNode.Hash, propRetries)
 		}
 		if err != nil {
 			return err
 		}
-		fmt.Printf("sent via propagation node %s hash=%s\n", hex.EncodeToString(propNode.Hash), hex.EncodeToString(msg.Hash))
+		s.mu.Lock()
+		s.propNode = used
+		s.mu.Unlock()
+		fmt.Printf("sent via propagation node %s", hex.EncodeToString(used.Hash))
+		if used.Name != "" {
+			fmt.Printf(" (%s)", used.Name)
+		}
+		fmt.Printf(" hash=%s\n", hex.EncodeToString(msg.Hash))
 		return nil
 	}
 

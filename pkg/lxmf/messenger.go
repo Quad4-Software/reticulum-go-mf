@@ -201,37 +201,7 @@ func (m *Messenger) SendStamped(msg *LXMessage, stampCost int) error {
 
 // SendPropagated uploads a packed message to propNodeHash via an RNS link.
 func (m *Messenger) SendPropagated(msg *LXMessage, propNodeHash []byte, pnStampCost int) error {
-	if msg == nil {
-		return errors.New("lxmf: nil message")
-	}
-	if len(propNodeHash) != DestinationLength {
-		return fmt.Errorf("propagation node: %w", ErrInvalidHashLength)
-	}
-	if len(msg.DestinationHash) != DestinationLength {
-		return fmt.Errorf("destination: %w", ErrInvalidHashLength)
-	}
-
-	remoteIdentity, err := identity.Recall(msg.DestinationHash)
-	if err != nil {
-		return fmt.Errorf("destination identity not found: %w", err)
-	}
-	if remoteIdentity == nil {
-		return ErrDestinationUnknown
-	}
-
-	recipient, err := destination.FromHash(msg.DestinationHash, remoteIdentity, destination.Single, m.transport)
-	if err != nil {
-		return fmt.Errorf("create recipient destination: %w", err)
-	}
-
-	signer := m.dest.GetIdentity()
-	if signer == nil {
-		return errors.New("lxmf: local destination has no identity")
-	}
-	if _, err := msg.Pack(signer); err != nil {
-		return err
-	}
-	if err := msg.PackPropagated(recipient, pnStampCost); err != nil {
+	if err := m.packForPropagation(msg, pnStampCost); err != nil {
 		return err
 	}
 
@@ -265,10 +235,7 @@ func (m *Messenger) SendStampedPropagated(msg *LXMessage, propNodeHash []byte, s
 		return fmt.Errorf("pre-pack: %w", err)
 	}
 	if stampCost > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-		defer cancel()
-		stamp, value, err := GenerateStamp(ctx, msg.Hash, stampCost, WorkblockExpandRounds)
-		cancel()
+		stamp, value, err := generateStampWithLog(msg.Hash, stampCost)
 		if err != nil {
 			return fmt.Errorf("stamp generation: %w", err)
 		}
