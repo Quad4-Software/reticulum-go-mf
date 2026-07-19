@@ -32,5 +32,9 @@ fmt.diff
 # Upstream LXMF reference clone for interop tests
 LXMF-ref/
 
+# Upstream rrcd reference clone for RRC interop tests
+RRC-ref/
+
 # Python interop test virtualenv
 pkg/lxmf/interoptest/.venv/
+pkg/rrc/interoptest/.venv/

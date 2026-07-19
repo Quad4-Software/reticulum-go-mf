@@ -1,6 +1,9 @@
 # github.com/dunglas/httpsfv v1.1.0
 ## explicit; go 1.14
 github.com/dunglas/httpsfv
+# github.com/fxamacker/cbor/v2 v2.9.2
+## explicit; go 1.20
+github.com/fxamacker/cbor/v2
 # github.com/godbus/dbus/v5 v5.2.2
 ## explicit; go 1.20
 github.com/godbus/dbus/v5
@@ -36,6 +39,9 @@ github.com/quic-go/quic-go/quicvarint
 # github.com/quic-go/webtransport-go v0.11.1
 ## explicit; go 1.25.0
 github.com/quic-go/webtransport-go
+# github.com/x448/float16 v0.8.4
+## explicit; go 1.11
+github.com/x448/float16
 # go.bug.st/serial v1.8.0
 ## explicit; go 1.25.0
 go.bug.st/serial

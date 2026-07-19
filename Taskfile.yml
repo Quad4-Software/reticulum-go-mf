@@ -92,6 +92,16 @@ tasks:
     cmds:
       - '{{.GOCMD}} test -v -count=1 ./pkg/lxmf/...'
 
+  test:rrc:
+    desc: Run all RRC unit and loopback tests
+    cmds:
+      - '{{.GOCMD}} test -v -count=1 ./pkg/rrc/...'
+
+  test:rrc:interop:
+    desc: Run RRC Go-Python interop tests via uv (requires RRC-ref clone and uv)
+    cmds:
+      - '{{.GOCMD}} test -v -count=1 -run TestInterop ./pkg/rrc/...'
+
   test:lxmf:interop:
     desc: Run LXMF Go-Python interop tests via uv (requires LXMF-ref clone and uv)
     cmds:

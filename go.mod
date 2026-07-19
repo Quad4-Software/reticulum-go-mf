@@ -3,6 +3,7 @@ module quad4/reticulum-go-mf
 go 1.26.5
 
 require (
+	github.com/fxamacker/cbor/v2 v2.9.2
 	golang.org/x/term v0.45.0
 	quad4/msgpack/v5 v5.8.2
 	quad4/reticulum-go v1.0.0
@@ -16,6 +17,7 @@ require (
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.60.0 // indirect
 	github.com/quic-go/webtransport-go v0.11.1 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	go.bug.st/serial v1.8.0 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/net v0.57.0 // indirect

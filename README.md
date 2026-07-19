@@ -1,6 +1,6 @@
 # Reticulum-Go Message Formats Library
 
-A message format for Reticulum-Go. The repository ships two
+A message format for Reticulum-Go. The repository ships three
 complementary packages:
 
 - `pkg/mf` - the lightweight native MF format, optimised for size and
@@ -8,9 +8,12 @@ complementary packages:
 - `pkg/lxmf` - a wire-compatible implementation of the LXMF protocol
   used by the broader Reticulum ecosystem, so a Go peer can exchange
   messages with any other LXMF client.
+- `pkg/rrc` - a wire-compatible implementation of
+  [Reticulum Relay Chat (RRC)](https://rrc.kc1awv.net/) for live
+  hub-and-spoke group chat over Reticulum Links.
 
-Both packages run on top of the same Reticulum-Go transport, so a
-single application can serve MF and LXMF traffic side by side.
+These packages run on top of the same Reticulum-Go transport, so a
+single application can serve MF, LXMF, and RRC traffic side by side.
 
 ## Installation
 
@@ -209,12 +212,68 @@ are run with `task test:lxmf:interop` and need `uv` and the `lxmf`
 package available when that test is present. If that test is not in your
 tree, the task simply runs no interop-matching cases.
 
+### Reticulum Relay Chat (RRC)
+
+`pkg/rrc` implements RRC protocol version 1 (spec 0.1.3): CBOR envelopes
+over a Reticulum Link to an `rrc.hub` destination, with client and hub
+session state machines, rooms, and live message relay.
+
+Hub:
+
+```go
+dest, err := rrc.NewHubDestination(id, tr)
+if err != nil {
+	log.Fatal(err)
+}
+hub, err := rrc.NewHub(tr, dest, rrc.HubConfig{Name: "go-hub", Version: "0.1.0"})
+if err != nil {
+	log.Fatal(err)
+}
+hub.Start()
+_ = dest.Announce(false, nil, nil)
+```
+
+Client:
+
+```go
+client, err := rrc.Dial(tr, id, hubHash, rrc.ClientConfig{
+	Nick: "alice",
+	Name: "my-client",
+	Handlers: rrc.ClientHandlers{
+		OnMsg: func(env *rrc.Envelope) {
+			text, _ := rrc.BodyAsString(env.Body)
+			log.Printf("[%s] %s", env.Room, text)
+		},
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+defer client.Close()
+
+if err := client.Join("#lobby"); err != nil {
+	log.Fatal(err)
+}
+// Wait for OnJoined before SendMsg, or track membership yourself.
+```
+
+Run RRC tests with `task test:rrc` or `go test ./pkg/rrc/...`.
+
+**Interop** — Optional Go↔Python checks use [rrcd](https://github.com/kc1awv/rrcd)
+via `uv`. Clone the reference into `RRC-ref`, then run
+`task test:rrc:interop` (or `go test -run TestInterop ./pkg/rrc/...`).
+Codec round-trips always run when the harness is available; the live
+UDP session test (`TestInterop_Live_PythonClientGoHub`) is skipped
+under `-short`.
+
 ## Prerequisites
 
 - Go 1.26.5 or later
 - [Task](https://taskfile.dev/) for build automation
-- `uv` (optional, only for optional LXMF Python interop tests when
+- `uv` (optional, for LXMF and RRC Python interop tests when
   `TestInterop` exists)
+- `RRC-ref` clone of [rrcd](https://github.com/kc1awv/rrcd) (optional,
+  only for RRC Python interop)
 
 You may set `alias task='go-task'` in your shell if you invoke Task as
 `go-task` on your system.
