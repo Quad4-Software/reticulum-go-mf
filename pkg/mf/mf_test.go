@@ -3,6 +3,7 @@ package mf
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"testing"
 
 	"quad4/reticulum-go/pkg/common"
@@ -199,7 +200,7 @@ func TestMessenger_SendMessage(t *testing.T) {
 
 	// Try to send a message (it will fail to find a path, but that proves the logic works up to that point)
 	err := m.SendMessage(peerHash, "Hello!")
-	if err != nil && err.Error() != "packet sending failed: no path to destination" {
+	if err != nil && !errors.Is(err, common.ErrNoPathToDestination) {
 		t.Errorf("SendMessage failed with unexpected error: %v", err)
 	}
 }

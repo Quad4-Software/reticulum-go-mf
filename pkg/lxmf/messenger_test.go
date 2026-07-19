@@ -249,13 +249,9 @@ func TestMessenger_RatchetEncryptedInbound(t *testing.T) {
 	}
 	m := NewMessenger(tr, dest)
 
-	if err := dest.Announce(false, nil, nil); err != nil {
-		t.Fatalf("announce: %v", err)
-	}
-
 	ratchetPriv := id.GetCurrentRatchetKey()
 	if ratchetPriv == nil {
-		t.Fatal("expected identity ratchet after announce")
+		t.Fatal("expected identity ratchet key")
 	}
 	ratchetPub, err := cryptography.PublicKeyFromPrivate(ratchetPriv)
 	if err != nil {
