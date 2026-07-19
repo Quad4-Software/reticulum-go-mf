@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2024-2026 Quad4.io
+
 package cryptography
 
 import (
@@ -10,7 +11,8 @@ import (
 // CryptoProvider abstracts the cryptographic primitives used by Reticulum.
 // The default implementation matches the on-wire protocol (X25519, Ed25519,
 // AES-256-CBC, HMAC-SHA256, HKDF-SHA256). Call SetProvider to substitute
-// implementations for testing or future algorithm agility; callers must preserve
+// implementations for testing or future algorithm agility. Callers must preserve
+
 // wire compatibility unless all peers are upgraded together.
 type CryptoProvider interface {
 	GenerateKeyPair() (privateKey, publicKey []byte, err error)

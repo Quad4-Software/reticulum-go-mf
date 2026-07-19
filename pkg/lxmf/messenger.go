@@ -31,6 +31,10 @@ type Messenger struct {
 	propLinkMu sync.Mutex
 	propLink   *link.Link
 	propLinkNode []byte
+
+	deliveryLinkMu sync.Mutex
+	deliveryLink   *link.Link
+	deliveryLinkPeer []byte
 }
 
 // NewMessenger registers d's packet callback for inbound LXMF. Use NewDeliveryDestination for lxmf.delivery naming.

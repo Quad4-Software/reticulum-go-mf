@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2024-2026 Sudo-Ivan / Quad4.io
+
 package transport
 
 // Wire-format constants for Reticulum packet headers.
@@ -51,7 +52,8 @@ const (
 
 	// MinAnnouncePacketSize is the smallest accepted announce packet
 	// across both header types (defensive lower bound used by the
-	// transport-layer dispatcher; the announce parser performs a
+	// transport-layer dispatcher. The announce parser performs a
+
 	// stricter, format-specific check).
 	MinAnnouncePacketSize = 53
 

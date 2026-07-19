@@ -211,7 +211,7 @@ tree, the task simply runs no interop-matching cases.
 
 ## Prerequisites
 
-- Go 1.26.2 or later
+- Go 1.26.5 or later
 - [Task](https://taskfile.dev/) for build automation
 - `uv` (optional, only for optional LXMF Python interop tests when
   `TestInterop` exists)

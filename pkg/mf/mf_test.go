@@ -56,6 +56,31 @@ func TestUnpack_TooShort(t *testing.T) {
 	}
 }
 
+func TestMessage_GroupPackUnpack(t *testing.T) {
+	senderHash, _ := hex.DecodeString(testHashHex)
+	groupHash, _ := hex.DecodeString("fedcba9876543210fedcba9876543210")
+	text := testMessageText
+
+	msg, err := NewMessageWithGroup(senderHash, groupHash, text)
+	if err != nil {
+		t.Fatalf("NewMessageWithGroup failed: %v", err)
+	}
+	packed, err := msg.Pack()
+	if err != nil {
+		t.Fatalf("Pack failed: %v", err)
+	}
+	unpacked, err := Unpack(packed)
+	if err != nil {
+		t.Fatalf("Unpack failed: %v", err)
+	}
+	if !bytes.Equal(unpacked.GroupHash, groupHash) {
+		t.Fatalf("group hash mismatch")
+	}
+	if unpacked.Text != text {
+		t.Fatalf("text mismatch")
+	}
+}
+
 func TestMessage_QoL(t *testing.T) {
 	senderHash, _ := hex.DecodeString(testHashHex)
 	text := testMessageText

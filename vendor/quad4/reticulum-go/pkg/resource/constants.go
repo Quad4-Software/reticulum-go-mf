@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2024-2026 Quad4.io
+
 package resource
 
 const (
@@ -31,8 +32,10 @@ const (
 	MapHashLen     = 4
 	RandomHashSize = 4
 
-	MaxEfficientSize    = 16*1024*1024 - 1
+	MaxEfficientSize    = 1*1024*1024 - 1
 	AutoCompressMaxSize = MaxEfficientSize
+	// MetadataMaxSize is the maximum packed metadata blob size.
+	MetadataMaxSize = 16 * 1024
 
 	PartTimeoutFactor         = 4
 	PartTimeoutFactorAfterRTT = 2
@@ -51,8 +54,9 @@ const (
 	CollisionGuardSize = 2*WindowMax + 100
 )
 
-// ResourceAdvertisement flag bits packed into the wire `f` field.
-// Bit positions and shifts are part of the wire format; do not reorder.
+// ResourceAdvertisement flag bits packed into the wire f field.
+// Bit positions and shifts are part of the wire format. Do not reorder.
+
 const (
 	AdvFlagEncrypted   byte = 0x01
 	AdvFlagCompressed  byte = 0x02
@@ -69,7 +73,8 @@ const (
 )
 
 // Heuristic compression-ratio estimates used to size segment buffers
-// before transmission. These are rough guesses by file class; tune them
+// before transmission. These are rough guesses by file class. Tune them
+
 // as we collect real-world numbers.
 const (
 	// CompressionEntropyBase is the floor compression ratio applied to

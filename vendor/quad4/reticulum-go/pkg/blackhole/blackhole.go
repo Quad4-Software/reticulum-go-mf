@@ -242,13 +242,18 @@ func (t *Table) SweepExpired() int {
 }
 
 // PersistLocal writes the local-source subset of the table to <dir>/local
-// in the msgpack layout used by persist_blackhole.
+// in the msgpack layout used by persist_blackhole. When dir is empty the
+// table is RAM-only and this is a no-op.
 func (t *Table) PersistLocal() error {
 	t.mu.RLock()
 	dir := t.dir
 	mu.Lock()
 	src := append([]byte(nil), localIdentityHash...)
 	mu.Unlock()
+	if dir == "" {
+		t.mu.RUnlock()
+		return nil
+	}
 	local := make(map[string]map[string]any)
 	for k, e := range t.entries {
 		if !equalBytes(e.Source, src) {
@@ -286,7 +291,8 @@ func (t *Table) PersistLocal() error {
 }
 
 // LoadAll loads every blackhole source file in <dir>. Files named "local"
-// are credited to the locally-stored identity hash; every other file name
+// are credited to the locally-stored identity hash. Every other file name
+
 // must be a hex-encoded source identity hash. When SetEnabledSources has
 // been called with a non-empty list, source files for sources not on the
 // list are skipped, matching Reticulum.blackhole_sources().
@@ -446,14 +452,16 @@ func (t *Table) EncodeForRequest() ([]byte, error) {
 
 // MaxDecodeSize bounds the size of a msgpack payload accepted by
 // DecodeBlackholeMap. A blackhole list with even tens of thousands of
-// entries fits comfortably below this; the cap exists to defeat
+// entries fits comfortably below this. The cap exists to defeat
+
 // adversarial inputs that declare a length far larger than the buffer
 // they actually carry.
 const MaxDecodeSize = 4 * 1024 * 1024
 
 // MaxEntries bounds the number of entries we accept in a single
 // payload. The wire stack does not enforce a hard cap, but the practical upper
-// bound is <<10k; anything larger almost certainly indicates an
+// bound is <<10k. Anything larger almost certainly indicates an
+
 // attempt to allocate an unreasonable amount of memory.
 const MaxEntries = 65535
 
@@ -579,6 +587,28 @@ func decodeNumeric(dec *msgpack.Decoder) (val float64, ok bool, err error) {
 	return 0, false, nil
 }
 
+// decodeUntil reads the blackhole until field. Nil means never expires
+// (Until=0). Non-numeric wire types are rejected so mistyped values cannot
+// silently become immortal bans.
+func decodeUntil(dec *msgpack.Decoder) (float64, error) {
+	c, err := dec.PeekCode()
+	if err != nil {
+		return 0, err
+	}
+	if c == msgpcode.Nil {
+		_ = dec.DecodeNil()
+		return 0, nil
+	}
+	val, ok, err := decodeNumeric(dec)
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, fmt.Errorf("non-numeric value")
+	}
+	return val, nil
+}
+
 func decodeEntry(dec *msgpack.Decoder, maxLen int) (Entry, error) {
 	subLen, err := dec.DecodeMapLen()
 	if err != nil {
@@ -604,13 +634,11 @@ func decodeEntry(dec *msgpack.Decoder, maxLen int) (Entry, error) {
 			}
 			entry.Source = b
 		case "until":
-			val, ok, err := decodeNumeric(dec)
+			val, err := decodeUntil(dec)
 			if err != nil {
 				return Entry{}, fmt.Errorf("decode until: %w", err)
 			}
-			if ok {
-				entry.Until = val
-			}
+			entry.Until = val
 		case "reason":
 			c, err := dec.PeekCode()
 			if err != nil {
@@ -660,8 +688,8 @@ func entryToMsgpackMap(e Entry) map[string]any {
 	return out
 }
 
-// encodeBlackholeMap encodes the map directly so identity-hash keys are
-// emitted as msgpack bin (matching umsgpack.packb).
+// encodeBlackholeMap encodes the map so identity-hash keys are emitted as
+// msgpack bin.
 func encodeBlackholeMap(in map[string]map[string]any) ([]byte, error) {
 	keys := make([]string, 0, len(in))
 	for k := range in {

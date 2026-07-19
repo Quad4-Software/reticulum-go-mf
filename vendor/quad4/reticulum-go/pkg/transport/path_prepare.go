@@ -17,7 +17,8 @@ const (
 )
 
 // PrepareFreshPathRequest ensures a path discovery packet is sent when the cached
-// route is missing, marked unresponsive, or expired (same TTL rules as HasPath).
+// route is missing, marked unresponsive, or older than PathRequestTTL (refresh
+// nudge). Membership itself follows PATHFINDER_E via HasPath.
 func (t *Transport) PrepareFreshPathRequest(destinationHash []byte) PrepareFreshPathReturn {
 	if t == nil || len(destinationHash) != 16 {
 		return PrepareFreshInvalidDestination
@@ -68,7 +69,8 @@ func (t *Transport) NudgePathRequest(destinationHash []byte) error {
 
 // ExpirePath drops the cached path entry (and path state / throttle hints) for this
 // destination so HasPath returns false until the next successful path update.
-// It does not send a packet; pair with RequestPath or PrepareFreshPathRequest.
+// It does not send a packet. Pair with RequestPath or PrepareFreshPathRequest.
+
 func (t *Transport) ExpirePath(destinationHash []byte) {
 	if t == nil || len(destinationHash) != 16 {
 		return

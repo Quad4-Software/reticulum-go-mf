@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2024-2026 Quad4.io
+
 package common
 
 import (
@@ -11,11 +12,12 @@ type PathStatus byte
 
 type Path struct {
 	Interface   NetworkInterface
-	LastSeen    time.Time
 	NextHop     []byte
 	Hops        uint8
 	LastUpdated time.Time
 	HopCount    uint8
+	RandomBlobs [][]byte
+	Expires     time.Time
 }
 
 // Common callbacks
