@@ -9,7 +9,7 @@ if [[ -d vendor ]]; then
 	GOVENDORFLAGS=(-mod=vendor)
 fi
 
-for pkg in ./pkg/lxmf/... ./pkg/mf/...; do
+for pkg in ./pkg/lxmf/... ./pkg/mf/... ./pkg/rrc/...; do
 	while IFS= read -r name; do
 		[[ -z "${name}" ]] && continue
 		echo "fuzz ${name} ${pkg}"

@@ -60,11 +60,12 @@ func NewHubDestination(id *identity.Identity, tr *transport.Transport) (*destina
 }
 
 type hubPeer struct {
-	sess     *session
-	peerHash []byte
-	active   bool
-	rooms    map[string]struct{}
-	msgTimes []time.Time
+	sess         *session
+	peerHash     []byte
+	active       bool
+	rooms        map[string]struct{}
+	msgTimes     []time.Time
+	pendingHello *Envelope
 }
 
 // Hub is an RRC hub that accepts Links and relays room traffic.
@@ -152,12 +153,31 @@ func (h *Hub) acceptLink(lnk *link.Link) {
 		registerOnce.Do(func() {
 			p.peerHash = append([]byte(nil), hash...)
 			key := peerKey(p.peerHash)
+			var old *hubPeer
+			var pending *Envelope
 			h.mu.Lock()
-			if old, ok := h.peers[key]; ok {
-				old.sess.close()
+			if prev, ok := h.peers[key]; ok && prev != p {
+				old = prev
+				for room := range old.rooms {
+					if members, ok := h.rooms[room]; ok {
+						delete(members, key)
+						if len(members) == 0 {
+							delete(h.rooms, room)
+						}
+					}
+				}
 			}
 			h.peers[key] = p
+			pending = p.pendingHello
+			p.pendingHello = nil
 			h.mu.Unlock()
+			if old != nil {
+				// Close outside the lock. dropPeerIf ignores stale sessions.
+				old.sess.close()
+			}
+			if pending != nil {
+				h.handlePeer(p, pending)
+			}
 		})
 	}
 
@@ -165,8 +185,12 @@ func (h *Hub) acceptLink(lnk *link.Link) {
 		if len(p.peerHash) == 0 {
 			if remote := lnk.GetRemoteIdentity(); remote != nil {
 				register(remote.Hash())
-			} else if len(env.Sender) == IdentityLength {
-				register(env.Sender)
+			} else if env.Type == TypeHello {
+				// Buffer HELLO until link identify completes. Never trust wire Sender.
+				h.mu.Lock()
+				p.pendingHello = env
+				h.mu.Unlock()
+				return
 			}
 		}
 		if len(p.peerHash) == 0 {
@@ -174,9 +198,7 @@ func (h *Hub) acceptLink(lnk *link.Link) {
 		}
 		h.handlePeer(p, env)
 	}, func() {
-		if len(p.peerHash) > 0 {
-			h.dropPeer(peerKey(p.peerHash))
-		}
+		h.dropPeerIf(p)
 	})
 
 	lnk.SetRemoteIdentifiedCallback(func(_ *link.Link, id *identity.Identity) {
@@ -190,10 +212,14 @@ func (h *Hub) acceptLink(lnk *link.Link) {
 	}
 }
 
-func (h *Hub) dropPeer(key string) {
+func (h *Hub) dropPeerIf(p *hubPeer) {
+	if p == nil || len(p.peerHash) == 0 {
+		return
+	}
+	key := peerKey(p.peerHash)
 	h.mu.Lock()
-	p, ok := h.peers[key]
-	if !ok {
+	cur, ok := h.peers[key]
+	if !ok || cur != p {
 		h.mu.Unlock()
 		return
 	}
@@ -214,14 +240,32 @@ func (h *Hub) dropPeer(key string) {
 	}
 }
 
-func (h *Hub) handlePeer(p *hubPeer, env *Envelope) {
-	if env.HasNick {
-		p.sess.setNick(env.Nick)
+func (h *Hub) applyInboundNick(p *hubPeer, nick string) error {
+	nick = SanitizeNick(nick)
+	if nick == "" {
+		return nil
 	}
+	if uint64(len(nick)) > h.cfg.Limits.MaxNickBytes {
+		return ErrNickTooLong
+	}
+	p.sess.setNick(nick)
+	return nil
+}
 
+func (h *Hub) handlePeer(p *hubPeer, env *Envelope) {
 	h.mu.Lock()
 	active := p.active
 	h.mu.Unlock()
+
+	if env.HasNick {
+		if err := h.applyInboundNick(p, env.Nick); err != nil {
+			_ = h.sendError(p, "nickname too long")
+			if !active {
+				p.sess.close()
+				return
+			}
+		}
+	}
 
 	if !active {
 		if env.Type != TypeHello {
@@ -252,15 +296,7 @@ func (h *Hub) handlePeer(p *hubPeer, env *Envelope) {
 
 func (h *Hub) onHello(p *hubPeer, env *Envelope) {
 	body, _ := ParseHelloBody(env.Body)
-	if env.HasNick {
-		nick := SanitizeNick(env.Nick)
-		if uint64(len(nick)) > h.cfg.Limits.MaxNickBytes {
-			_ = h.sendError(p, "nickname too long")
-			p.sess.close()
-			return
-		}
-		p.sess.setNick(nick)
-	}
+	// Nick already applied in handlePeer with length enforcement.
 
 	h.mu.Lock()
 	p.active = true
@@ -381,8 +417,10 @@ func (h *Hub) onRoomContent(p *hubPeer, env *Envelope) {
 				_ = h.sendError(p, "message body too large")
 				return
 			}
+		default:
+			_ = h.sendError(p, "invalid message body")
+			return
 		}
-
 	}
 
 	key := peerKey(p.peerHash)
@@ -405,7 +443,8 @@ func (h *Hub) onRoomContent(p *hubPeer, env *Envelope) {
 	nick := p.sess.getNick()
 	h.mu.Unlock()
 
-	fwd, err := NewEnvelope(env.Type, env.Sender)
+	// Always stamp authenticated peer identity. Never trust wire Sender.
+	fwd, err := NewEnvelope(env.Type, p.peerHash)
 	if err != nil {
 		return
 	}
@@ -419,9 +458,6 @@ func (h *Hub) onRoomContent(p *hubPeer, env *Envelope) {
 	}
 	if nick != "" {
 		fwd.Nick = nick
-		fwd.HasNick = true
-	} else if env.HasNick {
-		fwd.Nick = env.Nick
 		fwd.HasNick = true
 	}
 

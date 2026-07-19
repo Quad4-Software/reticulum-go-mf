@@ -64,6 +64,9 @@ func (r *PropagationRegistry) ReceivedAnnounce(destHash []byte, identAny any, ap
 	if !ok {
 		cost = int64(PropagationStampCostMin)
 	}
+	if cost < int64(PropagationStampCostMin) {
+		cost = int64(PropagationStampCostMin)
+	}
 
 	id, err := identityFromAnnounce(identAny, destHash)
 	if err != nil || id == nil {

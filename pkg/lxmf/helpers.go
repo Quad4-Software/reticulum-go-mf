@@ -97,28 +97,35 @@ func StampCostFromAppData(appData []byte) (cost int64, ok bool, err error) {
 	case nil:
 		return 0, false, nil
 	case int8:
-		return int64(v), true, nil
+		return clampAnnounceStampCost(int64(v))
 	case int16:
-		return int64(v), true, nil
+		return clampAnnounceStampCost(int64(v))
 	case int32:
-		return int64(v), true, nil
+		return clampAnnounceStampCost(int64(v))
 	case int64:
-		return v, true, nil
+		return clampAnnounceStampCost(v)
 	case uint8:
-		return int64(v), true, nil
+		return clampAnnounceStampCost(int64(v))
 	case uint16:
-		return int64(v), true, nil
+		return clampAnnounceStampCost(int64(v))
 	case uint32:
-		return int64(v), true, nil
+		return clampAnnounceStampCost(int64(v))
 	case uint64:
 		const maxStampCost uint64 = 1<<63 - 1
 		if v > maxStampCost {
 			return 0, false, nil
 		}
-		return int64(v), true, nil
+		return clampAnnounceStampCost(int64(v))
 	default:
 		return 0, false, nil
 	}
+}
+
+func clampAnnounceStampCost(cost int64) (int64, bool, error) {
+	if cost < 0 {
+		return 0, false, nil
+	}
+	return cost, true, nil
 }
 
 // EncodeAnnounceAppData returns legacy announce app data as raw UTF-8.
@@ -290,7 +297,7 @@ func PNStampCostFromAppData(data []byte) (int64, bool, error) {
 	}
 	costs, _ := arr[5].([]any)
 	cost, ok := asInt64(costs[0])
-	if !ok {
+	if !ok || cost < 0 {
 		return 0, false, nil
 	}
 	return cost, true, nil

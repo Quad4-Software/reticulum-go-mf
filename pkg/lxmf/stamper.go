@@ -88,6 +88,9 @@ func StampValid(stamp []byte, targetCost int, workblock []byte) bool {
 	if targetCost <= 0 {
 		return true
 	}
+	if len(stamp) != StampSize {
+		return false
+	}
 	if targetCost > 256 {
 		return false
 	}

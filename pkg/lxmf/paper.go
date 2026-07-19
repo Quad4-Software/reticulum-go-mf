@@ -42,5 +42,8 @@ func DecodePaperURI(uri string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidURI, err)
 	}
+	if len(decoded) > PaperMDU {
+		return nil, fmt.Errorf("%w: paper payload of %d bytes exceeds PaperMDU (%d)", ErrInvalidURI, len(decoded), PaperMDU)
+	}
 	return decoded, nil
 }

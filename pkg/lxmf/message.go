@@ -357,15 +357,13 @@ func (m *LXMessage) PackPropagated(recipient *destination.Destination, pnStampCo
 	m.TransientID = transientSum[:]
 
 	if pnStampCost > 0 {
-		if len(m.PropagationStamp) == 0 {
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-			defer cancel()
-			stamp, _, err := GenerateStamp(ctx, m.TransientID, pnStampCost, WorkblockExpandRoundsPN)
-			if err != nil {
-				return fmt.Errorf("propagation stamp: %w", err)
-			}
-			m.PropagationStamp = stamp
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancel()
+		stamp, _, err := GenerateStamp(ctx, m.TransientID, pnStampCost, WorkblockExpandRoundsPN)
+		if err != nil {
+			return fmt.Errorf("propagation stamp: %w", err)
 		}
+		m.PropagationStamp = stamp
 		lxmfData = append(lxmfData, m.PropagationStamp...)
 	}
 
@@ -593,6 +591,12 @@ func decodePayloadAndSplit(data []byte) ([]any, []byte, error) {
 			return nil, nil, decErr
 		}
 		out = append(out, v)
+	}
+	if r.Len() != 0 {
+		return nil, nil, fmt.Errorf("%w: trailing payload bytes", ErrInvalidPayload)
+	}
+	if arrLen != 4 && arrLen != 5 {
+		return nil, nil, fmt.Errorf("%w: unexpected payload array length %d", ErrInvalidPayload, arrLen)
 	}
 	return out, hashed, nil
 }
