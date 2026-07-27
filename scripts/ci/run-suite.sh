@@ -39,8 +39,14 @@ test-race)
 		./internal/leaktest/... ./pkg/lxmf/... ./pkg/mf/... ./pkg/rrc/...
 	;;
 examples)
-	for f in "$ROOT"/examples/*.go; do
-		[ -f "$f" ] || continue
+	# examples/*.go use //go:build ignore; single-file go build still type-checks them.
+	# lxmf_send.go needs reticulumconfig from a newer Reticulum-Go than this vendor pin.
+	for base in example.go messenger.go; do
+		f="$ROOT/examples/$base"
+		if [ ! -f "$f" ]; then
+			echo "examples: missing $f" >&2
+			exit 1
+		fi
 		echo "build example: $f"
 		"$GOCMD" build -o /dev/null "$f"
 	done

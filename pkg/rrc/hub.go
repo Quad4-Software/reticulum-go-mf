@@ -470,8 +470,8 @@ func (h *Hub) onRoomContent(p *hubPeer, env *Envelope) {
 }
 
 func (h *Hub) allowRate(p *hubPeer) bool {
-	limit := int(h.cfg.Limits.RateLimitMsgsPerMinute)
-	if limit <= 0 {
+	limit := h.cfg.Limits.RateLimitMsgsPerMinute
+	if limit == 0 {
 		return true
 	}
 	now := time.Now()
@@ -485,7 +485,7 @@ func (h *Hub) allowRate(p *hubPeer) bool {
 		}
 	}
 	p.msgTimes = kept
-	if len(p.msgTimes) >= limit {
+	if uint64(len(p.msgTimes)) >= limit {
 		return false
 	}
 	p.msgTimes = append(p.msgTimes, now)

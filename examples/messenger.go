@@ -43,7 +43,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	dest, err := destination.New(id, destination.IN, destination.SINGLE, exampleAppName, tr)
+	dest, err := destination.New(id, destination.In, destination.Single, exampleAppName, tr)
 	if err != nil {
 		log.Fatal(err)
 	}
