@@ -17,9 +17,25 @@ single application can serve MF, LXMF, and RRC traffic side by side.
 
 ## Installation
 
-```bash
-go get quad4/reticulum-go-mf
+The import path is `quad4/reticulum-go-mf`. The module is not on the public Go module proxy, so `go get quad4/reticulum-go-mf` will not work.
+
+Add it from GitHub in your application `go.mod`:
+
+```go
+require quad4/reticulum-go-mf v0.0.0
+
+replace quad4/reticulum-go-mf => github.com/Quad4-Software/reticulum-go-mf master
 ```
+
+Then run `go mod tidy`. Use a commit pseudo-version or tag instead of `master` when you need a reproducible build.
+
+For local development, clone this repository and point `replace` at the checkout:
+
+```go
+replace quad4/reticulum-go-mf => ../reticulum-go-mf
+```
+
+You will need the same `replace` entries for `quad4/reticulum-go` and related `quad4/*` modules as in this repo's `go.mod`, or set `GOPRIVATE=quad4/*` and configure access to the Quad4-Software GitHub modules.
 
 ## Usage
 
