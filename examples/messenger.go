@@ -105,7 +105,7 @@ func setupInterfaces(cfg *common.ReticulumConfig, tr *transport.Transport) error
 		cfg.Interfaces[udpIfaceName] = &common.InterfaceConfig{
 			Type:    "UDPInterface",
 			Enabled: true,
-			Address:  udpListenAddr,
+			Address: udpListenAddr,
 			Name:    udpIfaceName,
 		}
 	}
@@ -154,4 +154,3 @@ func setupInterfaces(cfg *common.ReticulumConfig, tr *transport.Transport) error
 
 	return nil
 }
-
