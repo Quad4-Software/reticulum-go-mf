@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"strings"
 
 	"quad4/msgpack/v5/pkg/msgpack"
 	"quad4/msgpack/v5/pkg/msgpack/msgpcode"
@@ -31,15 +32,20 @@ func DisplayNameFromAppData(appData []byte) (string, error) {
 		case nil:
 			return "", nil
 		case []byte:
-			return string(v), nil
+			return sanitizeAnnounceDisplayName(v), nil
 		case string:
-			return v, nil
+			return sanitizeAnnounceDisplayName([]byte(v)), nil
 		default:
 			return "", errors.New("lxmf: unsupported display name type")
 		}
 	}
 
 	return string(appData), nil
+}
+
+// sanitizeAnnounceDisplayName matches upstream v0.5.0+ announce display name handling.
+func sanitizeAnnounceDisplayName(raw []byte) string {
+	return strings.TrimSpace(strings.ReplaceAll(string(raw), "\x00", ""))
 }
 
 const announceAppDataArrayMax = 32

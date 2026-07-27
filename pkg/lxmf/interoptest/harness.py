@@ -14,6 +14,7 @@ import RNS.vendor.umsgpack as msgpack
 from LXMF import LXMessage
 import LXMF.LXStamper as LXStamper
 import LXMF.LXMF as LXMF
+import LXMF as LXMF_pkg
 
 RNS.loglevel = RNS.LOG_NONE
 
@@ -112,7 +113,7 @@ def _message_out(msg: LXMessage) -> dict[str, Any]:
 
 
 def cmd_ping(_req: dict[str, Any]) -> dict[str, Any]:
-    return {"ok": True, "lxmf_version": LXMF.__version__ if hasattr(LXMF, "__version__") else "unknown"}
+    return {"ok": True, "lxmf_version": LXMF_pkg.__version__}
 
 
 def cmd_pack(req: dict[str, Any]) -> dict[str, Any]:

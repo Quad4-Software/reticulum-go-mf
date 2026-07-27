@@ -39,6 +39,21 @@ func TestDisplayNameFromAppData_V5(t *testing.T) {
 	}
 }
 
+func TestDisplayNameFromAppData_V5SanitizesNullsAndSpace(t *testing.T) {
+	payload := []any{[]byte("  peer\x00name  "), int64(8)}
+	blob, err := marshalAnnounceAppData(payload)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	got, err := DisplayNameFromAppData(blob)
+	if err != nil {
+		t.Fatalf("DisplayNameFromAppData: %v", err)
+	}
+	if got != "peername" {
+		t.Errorf("got %q", got)
+	}
+}
+
 func TestStampCostFromAppData(t *testing.T) {
 	encoded, err := EncodeAnnounceAppDataV5("c", 64)
 	if err != nil {

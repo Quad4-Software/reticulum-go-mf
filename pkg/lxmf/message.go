@@ -684,7 +684,11 @@ func asFields(v any) (map[byte]any, error) {
 				if len(k) != 1 {
 					return nil, fmt.Errorf("%w: field key must encode as single byte, got %q", ErrInvalidPayload, k)
 				}
-				out[k[0]] = val
+				normalized, err := normalizeFieldValue(val)
+				if err != nil {
+					return nil, err
+				}
+				out[k[0]] = normalized
 			}
 			return out, nil
 		}
@@ -696,9 +700,42 @@ func asFields(v any) (map[byte]any, error) {
 		if err != nil {
 			return nil, err
 		}
-		out[key] = val
+		normalized, err := normalizeFieldValue(val)
+		if err != nil {
+			return nil, err
+		}
+		out[key] = normalized
 	}
 	return out, nil
+}
+
+func normalizeFieldValue(v any) (any, error) {
+	switch x := v.(type) {
+	case map[any]any:
+		return asFields(x)
+	case map[byte]any:
+		out := make(map[byte]any, len(x))
+		for k, val := range x {
+			normalized, err := normalizeFieldValue(val)
+			if err != nil {
+				return nil, err
+			}
+			out[k] = normalized
+		}
+		return out, nil
+	case []any:
+		out := make([]any, len(x))
+		for i, elem := range x {
+			normalized, err := normalizeFieldValue(elem)
+			if err != nil {
+				return nil, err
+			}
+			out[i] = normalized
+		}
+		return out, nil
+	default:
+		return v, nil
+	}
 }
 
 func asByteKey(v any) (byte, error) {

@@ -18,6 +18,9 @@ func TestInterop_Ping(t *testing.T) {
 	if resp.LXMFVersion == "" {
 		t.Fatal("expected lxmf_version in ping response")
 	}
+	if resp.LXMFVersion != "1.1.0" {
+		t.Fatalf("expected lxmf 1.1.0 ref, got %q", resp.LXMFVersion)
+	}
 }
 
 func TestInterop_GoPackPythonUnpack(t *testing.T) {
@@ -387,6 +390,18 @@ func TestInterop_AnnounceAppData(t *testing.T) {
 	})
 	if resp.DisplayName != "interop-node" {
 		t.Fatalf("display name: %q", resp.DisplayName)
+	}
+
+	sanitizedBlob, err := marshalAnnounceAppData([]any{[]byte("  interop\x00node  "), int64(24), []any{int(SFCompression)}})
+	if err != nil {
+		t.Fatalf("marshal sanitized announce: %v", err)
+	}
+	sanitizedResp := interopCall(t, map[string]any{
+		"cmd":      "announce_decode",
+		"app_data": hex.EncodeToString(sanitizedBlob),
+	})
+	if sanitizedResp.DisplayName != "interopnode" {
+		t.Fatalf("sanitized display name: %q", sanitizedResp.DisplayName)
 	}
 	cost, ok := resp.StampCost.(float64)
 	if !ok || int(cost) != 24 {

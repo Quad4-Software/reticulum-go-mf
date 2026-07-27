@@ -81,6 +81,26 @@ func TestAsFields_StringKeyMap(t *testing.T) {
 	}
 }
 
+func TestAsFields_NormalizesNestedDicts(t *testing.T) {
+	raw := map[any]any{
+		int64(FieldReaction): map[any]any{
+			int64(ReactionTo):      []byte{1, 2},
+			int64(ReactionContent): []byte("ok"),
+		},
+	}
+	got, err := asFields(raw)
+	if err != nil {
+		t.Fatalf("asFields: %v", err)
+	}
+	reaction, ok := got[FieldReaction].(map[byte]any)
+	if !ok {
+		t.Fatalf("reaction field type %T", got[FieldReaction])
+	}
+	if reaction[ReactionTo] == nil || reaction[ReactionContent] == nil {
+		t.Fatalf("nested keys not normalized: %#v", reaction)
+	}
+}
+
 func TestStampCostFromAppData_VariousIntegerWidths(t *testing.T) {
 	for _, cost := range []int64{0, 1, 64, 0xFFFF, 1 << 30} {
 		blob, err := EncodeAnnounceAppDataV5("peer", cost)
