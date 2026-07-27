@@ -14,7 +14,7 @@ func TestLeak_MF_PackUnpack(t *testing.T) {
 		t.Fatal(err)
 	}
 	base := leaktest.Baseline()
-	for i := 0; i < 10_000; i++ {
+	for range 10_000 {
 		msg := &Message{
 			SenderHash: senderHash,
 			Text:       "Hello, leak test.",

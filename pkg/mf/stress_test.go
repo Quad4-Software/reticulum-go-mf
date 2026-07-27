@@ -19,11 +19,9 @@ func TestStress_MF_ParallelPackUnpack(t *testing.T) {
 
 	var wg sync.WaitGroup
 	errs := make(chan error, workers)
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := 0; i < iters; i++ {
+	for range workers {
+		wg.Go(func() {
+			for range iters {
 				msg := &Message{
 					SenderHash: senderHash,
 					Text:       "parallel stress payload",
@@ -38,7 +36,7 @@ func TestStress_MF_ParallelPackUnpack(t *testing.T) {
 					return
 				}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	close(errs)

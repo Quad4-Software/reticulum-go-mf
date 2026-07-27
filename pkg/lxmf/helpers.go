@@ -70,7 +70,7 @@ func unmarshalMsgpackArray(appData []byte) ([]any, error) {
 		return nil, errors.New("lxmf: announce app data array too long")
 	}
 	out := make([]any, 0, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		v, err := dec.DecodeInterface()
 		if err != nil {
 			return nil, err

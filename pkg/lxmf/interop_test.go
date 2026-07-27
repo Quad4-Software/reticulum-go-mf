@@ -349,9 +349,9 @@ func TestInterop_ContainerRoundTrip(t *testing.T) {
 	}
 
 	pyPack := interopCall(t, map[string]any{
-		"cmd":    "pack",
-		"title":  "py-container",
-		"content": "in box",
+		"cmd":       "pack",
+		"title":     "py-container",
+		"content":   "in box",
 		"timestamp": 1700000021.0,
 	})
 	pyContainer := interopCall(t, map[string]any{

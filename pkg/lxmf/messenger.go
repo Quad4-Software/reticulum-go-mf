@@ -28,12 +28,12 @@ type Messenger struct {
 	handler  MessageHandler
 	resolver SourceResolver
 
-	propLinkMu sync.Mutex
-	propLink   *link.Link
+	propLinkMu   sync.Mutex
+	propLink     *link.Link
 	propLinkNode []byte
 
-	deliveryLinkMu sync.Mutex
-	deliveryLink   *link.Link
+	deliveryLinkMu   sync.Mutex
+	deliveryLink     *link.Link
 	deliveryLinkPeer []byte
 }
 

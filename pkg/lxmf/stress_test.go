@@ -26,11 +26,11 @@ func TestStress_LXMF_ParallelPackUnpack(t *testing.T) {
 
 	var wg sync.WaitGroup
 	errs := make(chan error, workers)
-	for w := 0; w < workers; w++ {
+	for w := range workers {
 		wg.Add(1)
 		go func(seed int) {
 			defer wg.Done()
-			for i := 0; i < iters; i++ {
+			for i := range iters {
 				msg, err := NewMessage(dh, sh, []byte("t"), []byte("content-stress"), nil)
 				if err != nil {
 					errs <- err
@@ -68,11 +68,9 @@ func TestStress_LXMF_StampWorkblockParallel(t *testing.T) {
 
 	var wg sync.WaitGroup
 	errs := make(chan error, workers)
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := 0; i < iters; i++ {
+	for range workers {
+		wg.Go(func() {
+			for i := range iters {
 				wb, err := StampWorkblock(material, 8+i%5)
 				if err != nil {
 					errs <- err
@@ -83,7 +81,7 @@ func TestStress_LXMF_StampWorkblockParallel(t *testing.T) {
 					return
 				}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	close(errs)

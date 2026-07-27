@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"quad4/reticulum-go/pkg/identity"
 	"quad4/reticulum-go-mf/internal/leaktest"
+	"quad4/reticulum-go/pkg/identity"
 )
 
 func TestLeak_LXMF_PackUnpack(t *testing.T) {
@@ -16,7 +16,7 @@ func TestLeak_LXMF_PackUnpack(t *testing.T) {
 	src := mustNewIdentity(t)
 	dst := mustNewIdentity(t)
 	dh, sh := dst.Hash(), src.Hash()
-	for i := 0; i < 500; i++ {
+	for i := range 500 {
 		msg, err := NewMessage(dh, sh, []byte("title"), []byte("content"), nil)
 		if err != nil {
 			t.Fatal(err)
@@ -35,7 +35,7 @@ func TestLeak_LXMF_UnpackRoundTrip(t *testing.T) {
 	dst := mustNewIdentity(t)
 	dh, sh := dst.Hash(), src.Hash()
 	identity.Remember(nil, sh, src.GetPublicKey(), nil)
-	for i := 0; i < 300; i++ {
+	for i := range 300 {
 		msg, err := NewMessage(dh, sh, []byte("t"), []byte("c"), nil)
 		if err != nil {
 			t.Fatal(err)

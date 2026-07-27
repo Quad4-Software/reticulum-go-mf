@@ -179,28 +179,16 @@ func ParseConfig(r io.Reader) (Config, error) {
 			}
 		}
 		if v, ok := section["propagation_stamp_cost_target"]; ok {
-			cfg.Propagation.PropagationStampCostTarget = parseInt(v)
-			if cfg.Propagation.PropagationStampCostTarget < PropagationStampCostMin {
-				cfg.Propagation.PropagationStampCostTarget = PropagationStampCostMin
-			}
+			cfg.Propagation.PropagationStampCostTarget = max(parseInt(v), PropagationStampCostMin)
 		}
 		if v, ok := section["propagation_stamp_cost_flexibility"]; ok {
-			cfg.Propagation.PropagationStampCostFlexibility = parseInt(v)
-			if cfg.Propagation.PropagationStampCostFlexibility < 0 {
-				cfg.Propagation.PropagationStampCostFlexibility = 0
-			}
+			cfg.Propagation.PropagationStampCostFlexibility = max(parseInt(v), 0)
 		}
 		if v, ok := section["peering_cost"]; ok {
-			cfg.Propagation.PeeringCost = parseInt(v)
-			if cfg.Propagation.PeeringCost < 0 {
-				cfg.Propagation.PeeringCost = 0
-			}
+			cfg.Propagation.PeeringCost = max(parseInt(v), 0)
 		}
 		if v, ok := section["remote_peering_cost_max"]; ok {
-			cfg.Propagation.RemotePeeringCostMax = parseInt(v)
-			if cfg.Propagation.RemotePeeringCostMax < 0 {
-				cfg.Propagation.RemotePeeringCostMax = 0
-			}
+			cfg.Propagation.RemotePeeringCostMax = max(parseInt(v), 0)
 		}
 		if v, ok := section["prioritise_destinations"]; ok {
 			cfg.Propagation.PrioritiseDestinations = parseList(v)
@@ -221,10 +209,7 @@ func ParseConfig(r io.Reader) (Config, error) {
 
 	if section, ok := sections["logging"]; ok {
 		if v, ok := section["loglevel"]; ok {
-			cfg.Logging.Level = parseInt(v)
-			if cfg.Logging.Level < LogCritical {
-				cfg.Logging.Level = LogCritical
-			}
+			cfg.Logging.Level = max(parseInt(v), LogCritical)
 			if cfg.Logging.Level > LogExtreme {
 				cfg.Logging.Level = LogExtreme
 			}
@@ -439,15 +424,15 @@ func readSectionedKV(r io.Reader) (map[string]map[string]string, error) {
 			}
 			continue
 		}
-		eq := strings.IndexByte(line, '=')
-		if eq < 0 {
+		before, after, ok := strings.Cut(line, "=")
+		if !ok {
 			return nil, fmt.Errorf("lxmf: malformed line %d: %q", lineNo, line)
 		}
 		if current == "" {
-			return nil, fmt.Errorf("lxmf: key %q outside any section at line %d", strings.TrimSpace(line[:eq]), lineNo)
+			return nil, fmt.Errorf("lxmf: key %q outside any section at line %d", strings.TrimSpace(before), lineNo)
 		}
-		k := strings.TrimSpace(line[:eq])
-		v := strings.TrimSpace(line[eq+1:])
+		k := strings.TrimSpace(before)
+		v := strings.TrimSpace(after)
 		if k == "" {
 			return nil, fmt.Errorf("lxmf: empty key at line %d", lineNo)
 		}

@@ -75,10 +75,10 @@ const (
 	FieldRNRRefs         byte = 0x0E
 	FieldRenderer        byte = 0x0F
 
-	FieldReplyTo    byte = 0x30
-	FieldReplyQuote byte = 0x31
-	FieldReaction   byte = 0x40
-	FieldComment    byte = 0x41
+	FieldReplyTo      byte = 0x30
+	FieldReplyQuote   byte = 0x31
+	FieldReaction     byte = 0x40
+	FieldComment      byte = 0x41
 	FieldContinuation byte = 0x42
 
 	FieldCustomType byte = 0xFB

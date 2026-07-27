@@ -16,7 +16,7 @@ func TestChaos_ParallelMarshal(t *testing.T) {
 	const iters = 200
 	var wg sync.WaitGroup
 	var fails atomic.Int64
-	for w := 0; w < workers; w++ {
+	for w := range workers {
 		wg.Add(1)
 		go func(seed int) {
 			defer wg.Done()
@@ -24,7 +24,7 @@ func TestChaos_ParallelMarshal(t *testing.T) {
 			for i := range sender {
 				sender[i] = byte(seed + i)
 			}
-			for i := 0; i < iters; i++ {
+			for range iters {
 				env, err := NewEnvelope(TypeMsg, sender)
 				if err != nil {
 					fails.Add(1)
@@ -119,7 +119,7 @@ func TestChaos_HubConcurrentClients(t *testing.T) {
 				errs.Add(1)
 				return
 			}
-			for i := 0; i < 20; i++ {
+			for range 20 {
 				if err := j.c.SendMsg("#chaos", "ping"); err != nil {
 					errs.Add(1)
 					return
@@ -144,7 +144,7 @@ func TestStress_RRC_RateLimitWindow(t *testing.T) {
 	h := &Hub{cfg: HubConfig{Limits: HubLimits{RateLimitMsgsPerMinute: 5}}}
 	p := &hubPeer{}
 	ok := 0
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		if h.allowRate(p) {
 			ok++
 		}

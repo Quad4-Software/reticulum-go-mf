@@ -38,7 +38,7 @@ func StampWorkblock(material []byte, expandRounds int) ([]byte, error) {
 	}
 
 	out := make([]byte, 0, 256*expandRounds)
-	for n := 0; n < expandRounds; n++ {
+	for n := range expandRounds {
 		nBytes, err := msgpack.Marshal(n)
 		if err != nil {
 			return nil, fmt.Errorf("lxmf: workblock msgpack: %w", err)
@@ -144,10 +144,7 @@ func GenerateStamp(ctx context.Context, messageID []byte, stampCost, expandRound
 	}
 	target := stampTargetBytes(stampCost)
 
-	workers := runtime.NumCPU()
-	if workers < 1 {
-		workers = 1
-	}
+	workers := max(runtime.NumCPU(), 1)
 
 	type result struct {
 		stamp []byte
@@ -159,9 +156,7 @@ func GenerateStamp(ctx context.Context, messageID []byte, stampCost, expandRound
 
 	var wg sync.WaitGroup
 	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			candidate := make([]byte, StampSize)
 			buf := make([]byte, 0, len(wb)+StampSize)
 			for {
@@ -186,7 +181,7 @@ func GenerateStamp(ctx context.Context, messageID []byte, stampCost, expandRound
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	go func() {

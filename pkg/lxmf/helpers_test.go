@@ -3,6 +3,7 @@ package lxmf
 
 import (
 	"bytes"
+	"maps"
 	"testing"
 
 	"quad4/msgpack/v5/pkg/msgpack"
@@ -216,9 +217,7 @@ func TestEncodeAnnounceAppDataV5WithFeatures_StampCostStillReadable(t *testing.T
 func buildPNAnnounce(t *testing.T, timebase int64, isPN bool, transferLimit, syncLimit, targetCost, costFlex, peeringCost int64, metadata map[byte]any) []byte {
 	t.Helper()
 	md := map[byte]any{}
-	for k, v := range metadata {
-		md[k] = v
-	}
+	maps.Copy(md, metadata)
 	payload := []any{
 		nil,
 		timebase,

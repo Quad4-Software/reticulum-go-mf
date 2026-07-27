@@ -43,7 +43,7 @@ type interopResponse struct {
 	DestinationPublicKey string         `json:"destination_public_key,omitempty"`
 	SourceHash           string         `json:"source_hash,omitempty"`
 	DestinationHash      string         `json:"destination_hash,omitempty"`
-	Message              interopMessage `json:"message,omitempty"`
+	Message              interopMessage `json:"message"`
 
 	Workblock string `json:"workblock,omitempty"`
 	Valid     bool   `json:"valid,omitempty"`
@@ -171,7 +171,7 @@ func registerInteropSource(t *testing.T, sourceHashHex, publicKeyHex string) {
 func interopIdentities(t *testing.T, id *identity.Identity) []map[string]string {
 	t.Helper()
 	return []map[string]string{{
-		"hash":        hex.EncodeToString(outDeliveryHash(t, id)),
+		"hash":       hex.EncodeToString(outDeliveryHash(t, id)),
 		"public_key": hex.EncodeToString(id.GetPublicKey()),
 	}}
 }

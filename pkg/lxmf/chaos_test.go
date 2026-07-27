@@ -20,12 +20,12 @@ func TestChaos_ParallelPaperURI(t *testing.T) {
 	const iters = 100
 	var wg sync.WaitGroup
 	var fails atomic.Int64
-	for w := 0; w < workers; w++ {
+	for w := range workers {
 		wg.Add(1)
 		go func(seed int) {
 			defer wg.Done()
 			payload := bytes.Repeat([]byte{byte(seed)}, 32+seed%64)
-			for i := 0; i < iters; i++ {
+			for range iters {
 				uri, err := PaperURI(payload)
 				if err != nil {
 					fails.Add(1)
@@ -63,7 +63,7 @@ func TestChaos_MessengerConcurrentSend(t *testing.T) {
 	var fails atomic.Int64
 	const n = 8
 	wg.Add(n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		go func(i int) {
 			defer wg.Done()
 			body := "chaos-" + strconv.Itoa(i)
@@ -97,11 +97,11 @@ func TestChaos_ParallelAnnounceEncode(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	var fails atomic.Int64
-	for w := 0; w < 32; w++ {
+	for w := range 32 {
 		wg.Add(1)
 		go func(w int) {
 			defer wg.Done()
-			for i := 0; i < 50; i++ {
+			for i := range 50 {
 				raw, err := EncodeAnnounceAppDataV5("n"+strconv.Itoa(w), int64(i%16))
 				if err != nil {
 					fails.Add(1)

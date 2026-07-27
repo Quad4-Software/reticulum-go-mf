@@ -109,7 +109,7 @@ func TestE2E_ParallelInboundHandlers(t *testing.T) {
 	})
 
 	const n = 5
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if _, err := mesh.m1.SendText(mesh.h2, "p", strconv.Itoa(i)); err != nil {
 			t.Fatal(err)
 		}

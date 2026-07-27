@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"time"
 
@@ -566,7 +567,7 @@ func decodePayloadAndSplit(data []byte) ([]any, []byte, error) {
 	posAfterHeader := totalLen - int64(r.Len())
 
 	out := make([]any, 0, arrLen)
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		v, decErr := dec.DecodeInterface()
 		if decErr != nil {
 			return nil, nil, decErr
@@ -631,7 +632,7 @@ func (c *msgpackMapCtx) decodeMap(d *msgpack.Decoder) (any, error) {
 		return nil, fmt.Errorf("%w: msgpack map too large (%d entries)", ErrInvalidPayload, n)
 	}
 	out := make(map[any]any, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		k, err := d.DecodeInterface()
 		if err != nil {
 			return nil, err
@@ -653,9 +654,7 @@ func copyFields(in map[byte]any) map[byte]any {
 		return nil
 	}
 	out := make(map[byte]any, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
+	maps.Copy(out, in)
 	return out
 }
 

@@ -75,7 +75,7 @@ func TestDecodePaperURI_AcceptsPadded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PaperURI: %v", err)
 	}
-	for pad := 0; pad < 4; pad++ {
+	for pad := range 4 {
 		padded := uri + strings.Repeat("=", pad)
 		decoded, err := DecodePaperURI(padded)
 		if err != nil {
